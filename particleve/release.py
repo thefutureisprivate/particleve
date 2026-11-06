@@ -102,7 +102,7 @@ def verify_directory(directory, keyring, certificate, *, artifacts=True):
 
 
 def inspect_uki(path, manifest):
-    sections = json.loads(run(["/usr/lib/systemd/ukify", "inspect", "--json=short", path]).stdout)
+    sections = json.loads(run(["/usr/lib/systemd/ukify", "--json=short", "inspect", path]).stdout)
     osrel = sections[".osrel"]["text"]
     values = dict(line.split("=", 1) for line in osrel.splitlines() if "=" in line)
     require(values["IMAGE_ID"].strip('"') == "ParticleVE", "UKI image identity mismatch")

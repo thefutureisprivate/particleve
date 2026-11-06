@@ -18,8 +18,12 @@ have evidence.
 
 The disposable Fedora recovery VM booted with Secure Boot, nested KVM and SSH.
 Preflight rejected its Fedora libtpms 0.10.2 software TPM because it cannot load
-the project's RSA4096 authorization key. No test disk has been partitioned. This
-is negative preflight evidence, not a ParticleVE boot/TPM acceptance result.
+the project's RSA4096 authorization key. The same VM passed all preflight checks
+with a test-only upstream libtpms build at commit
+`5b7bb9b8da269440dcba3f2f7f4bc40197d3c9e7`, profile `default-v2`, and loaded the
+actual project public key successfully. Production image packages are unchanged.
+No test disk has been partitioned; this is recovery-environment evidence, not a
+ParticleVE boot/TPM acceptance result.
 
 The generic UKI currently uses tty0. A configured serial getty can supply a login
 console, but kernel/initrd messages for arbitrary serial ports have not been
