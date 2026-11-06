@@ -1,5 +1,6 @@
 #!/bin/bash
 set -euo pipefail
+trap 'printf "ParticleVE initrd storage failed at line %s\n" "$LINENO" >&2' ERR
 udevadm settle --timeout=30
 mkdir -p /run/particleve-root-probe /sysroot
 lookup() {
@@ -48,6 +49,7 @@ while [[ -z $part_a || -z $part_b ]] && (( SECONDS - start < wait )); do
     fi
     sleep 1
 done
+swap_members=()
 for role in a b; do
     variable=part_$role
     partition=${!variable}
@@ -57,7 +59,13 @@ for role in a b; do
     expected_part=$(jq -er --arg role "$role" '.devices[] | select(.role == $role) | .partitions[] | select(.role == "state") | .uuid' "$manifest")
     [[ $(blkid -s PARTUUID -o value "$partition") == "$expected_part" ]]
     [[ $(blkid -s UUID -o value "/dev/mapper/particleve-state-$role") == $(jq -er '.btrfs.uuid' "$manifest") ]]
+    swap_part=$(jq -er --arg role "$role" '.devices[] | select(.role == $role) | .partitions[] | select(.role == "swap") | .uuid' "$manifest")
+    [[ $swap_part =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]]
+    test -b "/dev/disk/by-partuuid/$swap_part"
+    swap_members+=("/dev/disk/by-partuuid/$swap_part")
 done
+swap_uuid=$(jq -er '.swap.md_uuid | select(type == "string" and test("^[0-9a-f]{8}(:[0-9a-f]{8}){3}$"))' "$manifest")
+printf 'HOMEHOST <ignore>\nAUTO -all\nARRAY /dev/md/particleve-swap UUID=%s\n' "$swap_uuid" > /run/particleve-mdadm.conf
 umount /run/particleve-root-probe
 # Missing physical state is the only automatic degraded case. Present-but-locked or damaged devices failed above.
 options=rw,compress=zstd:1
@@ -66,6 +74,7 @@ source=/dev/mapper/particleve-state-a
 [[ -n $part_a ]] || source=/dev/mapper/particleve-state-b
 mount -t btrfs -o "$options" "$source" /sysroot
 if [[ ! -b /dev/md/particleve-swap ]]; then
-    mdadm --assemble --scan --run --config=/etc/mdadm.conf
+    mdadm --assemble --run --config=/run/particleve-mdadm.conf --uuid="$swap_uuid" /dev/md/particleve-swap "${swap_members[@]}"
 fi
 test -b /dev/md/particleve-swap
+[[ $(mdadm --detail --export /dev/md/particleve-swap | sed -n 's/^MD_UUID=//p') == "$swap_uuid" ]]

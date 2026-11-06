@@ -9,6 +9,8 @@ OnFailure=emergency.target
 [Service]
 Type=oneshot
 ExecStart=/usr/libexec/particleve-initrd-storage
+StandardOutput=journal+console
+StandardError=journal+console
 TimeoutStartSec=240
 RemainAfterExit=yes
 

@@ -31,6 +31,8 @@ particleve enroll-tpm --recovery-key-file /run/owner-recovery-passphrase
 ```
 
 The normal initrd has a five-minute boot deadline, cancelled at switch-root.
+Its timer survives emergency isolation. Root discovery allows up to four minutes
+for the independently encrypted state members and their owner recovery prompts.
 If it cannot reach the writable root and verified `/usr`, it requests another
 boot attempt before guest runtime access. Use the independent recovery environment
 for extended repair rather than waiting indefinitely in a failed normal initrd.
