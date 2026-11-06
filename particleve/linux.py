@@ -249,6 +249,10 @@ class Linux:
                 release, disk=self.disk(role)["path"], source=source, current=current
             ).items():
                 atomic_write(Path(temporary) / name, content.encode())
+            # Native sysupdate refuses a previously acquired partial set until
+            # it is vacuumed. The same explicit-disk definitions protect the
+            # authenticated running version while discarding pending fragments.
+            run(["/usr/lib/systemd/systemd-sysupdate", f"--definitions={temporary}", "vacuum"])
             run(
                 [
                     "/usr/lib/systemd/systemd-sysupdate",

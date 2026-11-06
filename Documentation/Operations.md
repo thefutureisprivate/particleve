@@ -167,8 +167,11 @@ resync, replacement or insufficient headroom defer automatic work. Root journal
 storage and update caches are bounded.
 
 Automatic preparation fixes one signed release version, verifies both explicit
-disk targets and hashes raw readback before exposing either new UKI. Existing
-boot counts and non-OS ESP files are preserved. At 04:30 Berlin time the dedicated
+disk targets and hashes raw readback before exposing either new UKI. Before a
+transfer, native sysupdate vacuum clears interrupted pending/partial OS resources
+using those same explicit-disk definitions and `ProtectVersion=` for the verified
+running release. Retrying an interrupted acquisition therefore keeps the running
+slots intact. Existing boot counts and non-OS ESP files are preserved. At 04:30 Berlin time the dedicated
 maintenance service rechecks eligibility before touching guests. It temporarily
 inhibits template starts/restarts, inventories actual units/machines/processes,
 sends ACPI poweroff and waits for actual process exits. Refusal, late/unexpected
