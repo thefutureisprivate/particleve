@@ -6,11 +6,17 @@ firmware has been modified. Automatic OS preparation and maintenance timers stay
 disabled. The owner selected delivery as an uncommissioned candidate; physical
 commissioning and enabling automation are outside this delivery.
 
+Candidate implementation and disposable acceptance completed on signed 45.1
+(`4db94b572a1f096e192ace7ed480ca26305cb7b1`). That image used kernel
+`7.2.15-300.fc45`, systemd `262.1+200+g63511d728-73.1`, QEMU `11.1.3-1.fc45`,
+swtpm `0.10.2-1.fc45` and fwupd `2.1.9-1.fc45`. Documentation-only successors
+carry the same implementation; the evidence below names the actual tested images.
+
 ## Proven disposable behavior
 
 | Area | Evidence |
 | --- | --- |
-| Build and publication | Four package-scoped GitHub hooks import source changes. OBS signs and publishes complete images and RPMs. Dependency-only rebuild 26.2 advanced the image version without changing Git or the retained-state contract. |
+| Build and publication | Four package-scoped GitHub hooks import source changes. OBS signs and publishes complete images and RPMs. Dependency-only rebuild 26.2 advanced the image version without changing Git or the retained-state contract. Source build 45.1 completed automatically after its RPM dependencies were published, using the original repository layout and flags. |
 | Verified boot | Fresh signed 35.1 booted with Secure Boot, EROFS/verity, SELinux enforcing, native audit/firewall, encrypted Btrfs RAID1 data/metadata and mirrored encrypted swap. TPM enrollment preserved owner recovery slots; subsequent normal boots unlocked unattended. |
 | Native OS update | Packaged 35.1 prepared both disks and activated signed 37.1 through the native coordinator. A running guest exited gracefully before reboot. New boot assessment/blessing completed and the shutdown ledger recorded completion without restoration failures. |
 | Virtualization | Final signed 37.1 ran native vmspawn, QEMU/KVM and swtpm in their confined domains with the same per-VM MCS pair. Native nsresourced allocated the TAP; networkd supplied DHCP. CAP_NET_ADMIN was absent from every VM process. Registration, readiness, pinned SSH, DNS and HTTPS worked. |
@@ -19,8 +25,8 @@ commissioning and enabling automation are outside this delivery.
 | Confinement | Actual final-image QEMU probes were denied cross-category VM files, host-private files and an unconfined host-service socket. The socket had matching filesystem categories and permissive DAC. swtpm could access matching-category state and was denied another pair. SELinux remained enforcing. |
 | Shutdown and scheduling | Native synchronous unit shutdown completed with guest exit zero and storage still mounted. Two real confined guests passed refusal, late-exit and interrupted-maintenance recovery: the host stayed running, only the affected stopped guest restarted, and concurrent starts were blocked. The native Berlin calendar retained 04:30 across both DST changes, with no catch-up timer. |
 | Maintenance and resources | Persistent manual maintenance and real memory pressure below the 1 GiB reserve deferred preparation without changing either guest invocation or rebooting. Physical RAM, Btrfs allocation/errors/capacity and swap redundancy are reported. Native zswap stored and recovered 4,096 disposable pages with byte-identical readback. Virtual-disk SMART was explicitly unavailable; SMART-fault guards have regression coverage. |
-| Checks | Ruff, formatting, shell syntax and 91 tests pass, including disposable GPG checks, transfer identities, boot blessing, transactions, resources, shutdown and MCS launch contracts. The resolved pinned mkosi configuration passes its build check. |
-| Firmware | Native fwupd device/update discovery worked and reported no eligible update. The EFI helper is project-signed. Metadata refresh is separate from supervised installation; no firmware installation was performed. |
+| Checks | Ruff, formatting, shell syntax and 95 tests pass, including disposable GPG checks, transfer identities, boot blessing, transactions, resources, shutdown and MCS launch contracts. The resolved pinned mkosi configuration passes its build check. |
+| Firmware | On signed 44.1, native fwupd refreshed LVFS metadata, discovered both selected ESPs and reported no eligible update. Its installed EFI helper passed project-certificate verification. Metadata refresh is separate from supervised installation; no firmware installation was performed. |
 
 ## Single-member and disk-replacement validation
 
@@ -95,7 +101,9 @@ All twelve A/B signature, verity, usr, UKI, bootloader and fallback-loader
 interruption boundaries passed on 42.1 while preparing 43.1. The retained sets
 authenticated, incomplete candidates remained unreferenced, and running guest
 invocations stayed unchanged. These tests used the explicit native vacuum
-prototype; corrected packaged retry acceptance remains in progress. An ordinary
+prototype. Signed 44.1 then passed the packaged correction: after a real partial
+45.1 usr acquisition, plain `particleve prepare --manual` completed and verified
+both boot paths without operator vacuum, guest restarts or a host reboot. An ordinary
 reboot during preparation preserved pending state and honored disabled guest
 startup policies. No writable-root or guest-data recovery/migration is involved.
 
@@ -107,8 +115,19 @@ but inspection found its PTY lacked categories. Source now quarantines newly
 allocated PTYs above every valid VM category pair. A guarded native QEMU handoff
 labels inherited console descriptors with the owning pair before transitioning
 to confined QEMU. It preserves native arguments and descriptors and rejects
-unexpected labels or launch paths. Corrected-image console operation and
-cross-category PTY rejection remain to be validated; SELinux remains enforcing.
+unexpected labels or launch paths. Signed 45.1 ran the native read-only serial
+console with its exact category pair. Real confined QEMU opened a matching-pair
+test terminal and was denied both the other running guest's console and a
+controlled foreign-pair terminal. The loaded kernel's creation decision confirms
+the all-category quarantine label, and its access decision denies QEMU all
+open/read/write access to that label. The native guest was restored after the
+probes; the other guest's invocation stayed unchanged. SELinux remained enforcing.
+Both guests subsequently passed pinned SSH and retained-marker checks; the first
+retained its EFI variable and vTPM NV value. Cold homed SSH passed on 45.1. Final
+checks verified both authenticated boot paths, healthy encrypted RAID1/swap,
+NOCOW only on raw guest disks, CoW on auxiliary files, unchanged unselected-disk
+hash, disabled external startup policies and inactive automatic OS timers. No
+temporary probe or private-device unit override remained.
 
 ## Scope and remaining validation
 
@@ -123,9 +142,7 @@ key. Fedora libtpms 0.10.2 correctly failed capability preflight; the production
 TPM packages and measurement requirements were unchanged. Older 2 MiB test
 firmware lacked usable measured-boot evidence and was rejected.
 
-Open acceptance includes native serial-console operation, full interrupted-update
-boundaries and corrected packaged partial-set retry,
-pressure-derived RAM minima, Intel/AMD and
+Open acceptance includes pressure-derived RAM minima, Intel/AMD and
 controller/NIC variation, real SMART and supported firmware update transports.
 Earlier writable diagnostic prototypes are not final-image acceptance. Every
 PLAN.md milestone stays open where its complete exit criteria lack evidence.

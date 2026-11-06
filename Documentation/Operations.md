@@ -121,8 +121,13 @@ SELinuxContext=system_u:system_r:particleve_vmspawn_t:s0:c10,c20
 
 The mandatory internal launch guard rejects missing/mismatched categories,
 duplicate category pairs, nonprivate directories, disabled enforcement and absent
-KVM before launching QEMU. It labels only PID1's temporary per-VM runtime
-directory. The packaged policy transitions QEMU into `svirt_t` and swtpm into
+KVM before launching QEMU. It labels PID1's temporary per-VM runtime directory.
+Keep the packaged `PATH`: native vmspawn selects the guarded QEMU handoff there.
+New console PTYs initially receive a quarantine label inaccessible to guests;
+the handoff assigns the owning category pair to inherited console descriptors
+before executing the packaged QEMU, preserving native arguments and open file
+descriptors. Neither helper relabels retained VM storage.
+The packaged policy transitions QEMU into `svirt_t` and swtpm into
 `swtpm_t`, with MCS constraints on both. The trusted vmspawn controller has its
 own confined domain. Maintenance verifies actual process labels and category
 agreement; an unconfined or unexpected process blocks activation.

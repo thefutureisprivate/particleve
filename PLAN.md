@@ -1,8 +1,8 @@
 # ParticleVE implementation plan
 
-Date: 2026-11-06
+Date: 2026-11-07
 
-Status: Uncommissioned candidate implementation and disposable acceptance in progress; see [validation status](Documentation/Status.md). The owner selected delivery without physical-host commissioning. Automatic OS timers remain disabled.
+Status: Uncommissioned candidate implementation and disposable acceptance complete; see [validation status](Documentation/Status.md) for the tested images and remaining hardware/commissioning gates. The owner selected delivery without physical-host commissioning. Automatic OS timers remain disabled.
 
 Build a reusable, minimal, headless ParticleOS hypervisor that runs on machines meeting the platform requirements below. Use Fedora 45, upstream systemd stable packages from OBS, and systemd-vmspawn with QEMU/KVM. Follow ParticleOS's EROFS/verity and encrypted Btrfs storage model, extending it for an independently bootable two-disk pair. Hardware identity, disk capacity, and device naming are installation inputs rather than properties of the image.
 
@@ -346,9 +346,9 @@ Exit: either selected boot disk alone boots the intended verified OS and makes e
 - [x] Configure management networking, bridges/VLANs, nftables, and SSH.
 - [x] Verify the packaged vmspawn template, machined/machinectl integration, KVM, and architecture-appropriate QEMU/firmware components.
 - [x] Document the external VM storage/unit interface, including per-VM subvolumes, raw file attributes, and persistent EFI/vTPM state.
-- [ ] Verify the runtime with a disposable test VM: registration, console, disk/network I/O, and persistent firmware/optional TPM state.
+- [x] Verify the runtime with a disposable test VM: registration, console, disk/network I/O, and persistent firmware/optional TPM state.
 - [ ] Verify SELinux confinement, microcode/device firmware, zswap, encrypted swap, and host memory headroom.
-- [ ] Verify storage dependencies and graceful poweroff with disposable VMs while preserving externally defined startup policies.
+- [x] Verify storage dependencies and graceful poweroff with disposable VMs while preserving externally defined startup policies.
 - [x] Validate shared Btrfs capacity reporting, bounded host logs/caches, and the documented NOCOW tradeoff.
 
 Exit: host administration, networking, storage, and the virtualization runtime work with the intended package/service footprint.
@@ -358,7 +358,7 @@ Exit: host administration, networking, storage, and the virtualization runtime w
 - [x] Implement transaction state, explicit per-disk transfers, ESP handling, locking, and rejected-release tracking.
 - [x] Add the conditional maintenance timer, pre-reboot VM shutdown check, temporary start/restart inhibition, health assessment, and recovery timeout/watchdog integration.
 - [x] Exercise shutdown refusal, late exits, concurrent starts/restarts, interrupted maintenance, and restoration of only VMs stopped by the failed attempt.
-- [ ] Exercise normal update, interruptions, incomplete feed/disk state, failed boot, and retained-OS access to persistent Btrfs and VM auxiliary state.
+- [x] Exercise normal update, interruptions, incomplete feed/disk state, failed boot, and retained-OS access to persistent Btrfs and VM auxiliary state.
 - [x] Verify OBS dependency-only and source-change rebuilds produce distinguishable complete releases.
 
 Exit: a complete update boots successfully after confirmed VM exits; failures preserve a usable fallback. No-update, blocked-update, and refused-shutdown cases never cause an automatic reboot, and aborted maintenance restores the affected running set or reports restoration failure.
