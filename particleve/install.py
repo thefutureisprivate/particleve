@@ -350,7 +350,12 @@ def install(config, release_directory, proposed, confirmation, keyfile, *, keyri
                         shutil.copytree(release_directory, directory / "releases" / release["version"])
                         contexts = factory / "selinux/targeted/contexts/files/file_contexts"
                         require(contexts.exists(), "SELinux file contexts missing from image")
-                        run(["setfiles", "-r", root, contexts, root], timeout=600)
+                        policies = list((factory / "selinux/targeted/policy").glob("policy.[0-9]*"))
+                        require(
+                            len(policies) == 1 and policies[0].is_file() and not policies[0].is_symlink(),
+                            "image must supply one regular compiled SELinux policy",
+                        )
+                        run(["setfiles", "-c", policies[0], "-r", root, contexts, root], timeout=600)
                     finally:
                         run(["umount", usr])
                 backend = Linux(config, root / "var/lib/particleve")

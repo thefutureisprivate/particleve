@@ -154,6 +154,11 @@ def root_check(root, *, tree="usr", output=None):
             "UsePAM yes" in ssh and "userdbctl ssh-authorized-keys %u" in ssh,
             "generic SSH defaults must activate homed and retrieve keys through upstream userdb",
         )
+        userdb_rule = root / "usr/lib/tmpfiles.d/20-systemd-userdb.conf"
+        require(
+            not userdb_rule.exists() and not userdb_rule.is_symlink(),
+            "the optional userdb link rule cannot mutate read-only factory SSH defaults",
+        )
         for file in (root / "usr/lib/tmpfiles.d").glob("*.conf"):
             require(
                 not re.search(r"^h\S*\s+/var/lib/machines\s+.*\+C", file.read_text(), re.M),

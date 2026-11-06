@@ -18,10 +18,10 @@ the host's disk encryption; public SSH keys live in homed user records and are
 retrieved by upstream userdb. Root's recovery home remains `/root`. SSH, console,
 TPM, disk replacement and fallback must pass commissioning on the actual host.
 
-This is an **uncommissioned implementation**. The fwupd EFI helper has built and
-been signed in the [ParticleVE OBS project](https://build.opensuse.org/project/show/home:thefutureisprivate:particleve).
-A complete signed image and the hardware acceptance matrix are still release
-gates. No installation disks or firmware have been altered. x86-64/v2 and example
+This is an **uncommissioned implementation**. Image 21.1 has been built, signed,
+published in the [ParticleVE OBS project](https://build.opensuse.org/project/show/home:thefutureisprivate:particleve)
+and accepted by the signed-feed client. Boot and hardware acceptance remain release
+gates. Only disposable VM disks and copied virtual firmware have been altered. x86-64/v2 and example
 resource thresholds are candidate settings; measured minima remain unpublished.
 See [Status.md](Documentation/Status.md) for the exact validation boundary.
 

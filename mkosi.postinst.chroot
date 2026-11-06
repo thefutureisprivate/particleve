@@ -16,11 +16,10 @@ fi
 find /usr/lib/pam.d/ -mindepth 1 -exec sed --in-place '/pam_shells.so/d' {} \;
 find /usr/lib/pam.d/ -mindepth 1 -exec sed --in-place '/pam_securetty.so/d' {} \;
 
-# Fedora disables the userdb ssh dropin by default, but helpfully leaves it available in
-# the package so that we can just symlink it to a name that will be picked up by systemd-tmpfiles.
-if [[ -f /usr/lib/tmpfiles.d/20-systemd-userdb.conf.example ]]; then
-    ln --symbolic 20-systemd-userdb.conf.example /usr/lib/tmpfiles.d/20-systemd-userdb.conf
-fi
+# The profile ships userdb's AuthorizedKeysCommand in its generic SSH defaults.
+# Its /etc/ssh/sshd_config.d link resolves into the read-only factory tree, so
+# the upstream optional link rule must not create or relabel files through it.
+rm -f /usr/lib/tmpfiles.d/20-systemd-userdb.conf
 
 # Give ParticleOS its own identity/branding via os-release +
 # issue. Note that we keep the original $ID, $VERSION and $VERSION_ID
