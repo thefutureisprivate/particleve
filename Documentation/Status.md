@@ -17,9 +17,9 @@ commissioning and enabling automation are outside this delivery.
 | Retained state | Guest disk and EFI markers, external unit definitions, disabled startup policy and SSH identity survived restart/update. Native vTPM manufacture succeeded on 37.1, and a persistent NV marker was written/read. Raw disks alone used NOCOW; EFI/vTPM state retained CoW. |
 | Accounts | A cold inactive non-root homed subvolume accepted key-plus-password SSH, activated its home and preserved its marker through the OS update. Key-only cold-home login was rejected. Root retained independent key-only SSH and its encrypted home. |
 | Confinement | Actual final-image QEMU probes were denied cross-category VM files, host-private files and an unconfined host-service socket. The socket had matching filesystem categories and permissive DAC. swtpm could access matching-category state and was denied another pair. SELinux remained enforcing. |
-| Shutdown and scheduling | Native synchronous unit shutdown completed with guest exit zero and storage still mounted. Earlier disposable refusal/late-exit tests kept the host running, reported unsettled guests, and restored only the affected invocation. The native Berlin calendar retained 04:30 across both DST changes, with no catch-up timer. |
+| Shutdown and scheduling | Native synchronous unit shutdown completed with guest exit zero and storage still mounted. Two real confined guests passed refusal, late-exit and interrupted-maintenance recovery: the host stayed running, only the affected stopped guest restarted, and concurrent starts were blocked. The native Berlin calendar retained 04:30 across both DST changes, with no catch-up timer. |
 | Maintenance and resources | Persistent manual maintenance deferred preparation without changing the running guest invocation. Physical RAM, available RAM, Btrfs allocation/errors/capacity and swap redundancy are reported. Virtual-disk SMART was explicitly unavailable. Low-RAM and SMART-fault guards are tested. |
-| Checks | Ruff, formatting, shell syntax and 86 tests pass, including disposable GPG checks, transfer identities, boot blessing, transactions, resources, shutdown and MCS launch contracts. The resolved pinned mkosi configuration passes its build check. |
+| Checks | Ruff, formatting, shell syntax and 88 tests pass, including disposable GPG checks, transfer identities, boot blessing, transactions, resources, shutdown and MCS launch contracts. The resolved pinned mkosi configuration passes its build check. |
 | Firmware | Native fwupd device/update discovery worked and reported no eligible update. The EFI helper is project-signed. Metadata refresh is separate from supervised installation; no firmware installation was performed. |
 
 ## Single-member recovery under test
@@ -55,6 +55,26 @@ membership before its partial signature was cleared. The retained survivor was
 untouched. Final-image replacement and independent replacement-boot acceptance
 remain in progress.
 
+## Boot-counter selection correction
+
+A real 39.1 activation stopped both guests gracefully, then a reversible QEMU
+management-carrier fault caused three native assessment failures and reboots.
+Restoring the carrier for the fourth boot revealed that the version-specific
+loader.conf default still forced the exhausted entry. The retained EFI variable
+reported its original `+0-4.efi` boot-count path. No assessment or policy override
+was used. The host then passed normal 39.1 assessment and blessing after carrier
+restoration, so this is not recorded as successful fallback.
+
+Source keeps the current version pinned while preparation is incomplete. After
+both complete releases are exposed, activation selects the ParticleVE namespace
+and lets native boot ordering prefer a viable release over an exhausted one.
+It refuses an already exhausted candidate and never resets its counters.
+A native temporary GPT ESP probe with real signed UKIs confirmed that the old
+pattern selects the exhausted 39.1 entry, while the corrected pattern selects
+the good 38.1 fallback without changing either real ESP or EFI variables. Fresh
+signed-image retry, fallback and quarantine acceptance remain required.
+See the upstream [boot-counting contract](https://www.freedesktop.org/software/systemd/man/latest/systemd-boot.html#Boot%20Counting).
+
 ## Scope and remaining validation
 
 The fixture uses two 80 GiB virtio disks, an unselected marker disk, 6 GiB configured
@@ -70,7 +90,7 @@ firmware lacked usable measured-boot evidence and was rejected.
 
 Open acceptance includes replacement/independent-A completion, failed-boot counter
 exhaustion and quarantine, live active-usr loss, full interrupted-update boundaries,
-multiple-guest maintenance races, pressure-derived RAM minima, Intel/AMD and
+pressure-derived RAM minima, Intel/AMD and
 controller/NIC variation, real SMART and supported firmware update transports.
 Earlier writable diagnostic prototypes are not final-image acceptance. Every
 PLAN.md milestone stays open where its complete exit criteria lack evidence.

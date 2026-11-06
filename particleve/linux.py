@@ -282,13 +282,14 @@ class Linux:
                 atomic_write(esp / name, source.read_bytes())
 
     @staticmethod
-    def default(esp, version):
+    def default(esp, version=None):
         path = esp / "loader/loader.conf"
         old = (
             path.read_text().splitlines() if path.exists() else ["timeout 5", "editor no", "auto-entries no"]
         )
         lines = [line for line in old if not re.match(r"\s*default\s", line)]
-        lines.append(f"default ParticleVE_{version}_x86-64*.efi")
+        selected = version if version is not None else "*"
+        lines.append(f"default ParticleVE_{selected}_x86-64*.efi")
         atomic_write(path, ("\n".join(lines) + "\n").encode())
 
     def protect_current(self, current, candidate):
@@ -330,7 +331,15 @@ class Linux:
     def select(self, version):
         for role in ("a", "b"):
             with self.esp(role) as esp:
-                self.default(esp, version)
+                entries = self.boot_entries(esp, version)
+                require(
+                    len(entries) == 1 and (entries[0][1][1] is None or int(entries[0][1][1]) > 0),
+                    f"disk {role} has no eligible candidate boot entry",
+                )
+                # An exact default forces even an exhausted entry. Both complete
+                # releases are visible now: native ordering chooses the newer
+                # eligible release and falls back when its counter reaches zero.
+                self.default(esp)
 
     def conditional_reboot(self, version):
         # Use the booted ESP's disk for upstream's installed-version comparison.

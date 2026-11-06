@@ -54,7 +54,30 @@ class ESPTests(unittest.TestCase):
         for esp in self.esps.values():
             text = (esp / "loader/loader.conf").read_text()
             self.assertIn("timeout 9", text)
-            self.assertIn("default ParticleVE_2_x86-64*.efi", text)
+            self.assertIn("default ParticleVE_*_x86-64*.efi", text)
+
+    def test_preparation_pins_current_but_activation_allows_native_fallback_ordering(self):
+        for role, esp in self.esps.items():
+            self.backend.expose_boot(role, self.manifest)
+            (esp / "EFI/Linux/ParticleVE_1_x86-64.efi").write_bytes(b"retained UKI")
+        self.backend.protect_current("1", "2")
+        for esp in self.esps.values():
+            self.assertIn("default ParticleVE_1_x86-64*.efi", (esp / "loader/loader.conf").read_text())
+        self.backend.select("2")
+        for esp in self.esps.values():
+            self.assertIn("default ParticleVE_*_x86-64*.efi", (esp / "loader/loader.conf").read_text())
+            self.assertTrue((esp / "EFI/Linux/ParticleVE_1_x86-64.efi").exists())
+
+    def test_activation_refuses_an_exhausted_candidate_without_resetting_it(self):
+        for role, esp in self.esps.items():
+            self.backend.expose_boot(role, self.manifest)
+            (esp / "EFI/Linux/ParticleVE_2_x86-64+3.efi").rename(
+                esp / "EFI/Linux/ParticleVE_2_x86-64+0-3.efi"
+            )
+        with self.assertRaisesRegex(Error, "eligible candidate"):
+            self.backend.select("2")
+        for esp in self.esps.values():
+            self.assertTrue((esp / "EFI/Linux/ParticleVE_2_x86-64+0-3.efi").exists())
 
     def test_exhausted_counter_never_becomes_a_fallback_or_gets_reset(self):
         self.backend.expose_boot("a", self.manifest)
