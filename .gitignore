@@ -1,3 +1,17 @@
+__pycache__/
+*.pyc
+*.egg-info/
+.venv/
+.ruff_cache/
+build/
+dist/
+*.key
+*.pem
+!examples/*.pem
+!mkosi.extra/usr/lib/particleve/trust/pcr-public-key.pem
+!mkosi.initrd.conf/mkosi.extra/etc/systemd/tpm2-pcr-public-key.pem
+
+# ParticleOS build output and local publication inputs
 # SPDX-License-Identifier: LGPL-2.1-or-later
 mkosi.local/
 mkosi.local.conf
@@ -10,3 +24,6 @@ mkosi.crt
 mkosi.version
 mkosi.rootpw
 .mkosi-private
+
+mkosi.local.conf
+mkosi.version

@@ -1,0 +1,17 @@
+[Unit]
+Description=Assess required host capabilities before blessing this OS
+Requires=particleve-runtime-ready.service
+Wants=boot-complete.target
+After=particleve-runtime-ready.service network-online.target
+Before=boot-complete.target systemd-bless-boot.service
+OnFailure=particleve-boot-failed.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/particleve assess
+TimeoutStartSec=180
+RemainAfterExit=yes
+
+[Install]
+RequiredBy=boot-complete.target
+WantedBy=multi-user.target

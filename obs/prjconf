@@ -1,0 +1,9 @@
+Release: <CI_CNT>.<B_CNT>
+Prefer: systemd-udev systemd-boot
+Prefer: -systemd-standalone-repart -systemd-boot-unsigned
+%if "%_repository" == "Fedora_45_images"
+Type: mkosi
+Repotype: checksumsfile:rawsig staticlinks
+Patterntype: none
+Support: mkosi particleve-build-tools
+%endif

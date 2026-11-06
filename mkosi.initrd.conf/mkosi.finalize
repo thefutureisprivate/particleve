@@ -1,0 +1,4 @@
+#!/bin/bash
+# SPDX-License-Identifier: LGPL-2.1-or-later
+set -euo pipefail
+PYTHONPATH="$SRCDIR" python3 "$SRCDIR/tools/check-build.py" --root "$BUILDROOT" --tree initrd

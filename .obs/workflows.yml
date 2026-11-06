@@ -1,31 +1,13 @@
 rebuild:
   steps:
     - trigger_services:
-        project: system:systemd
-        package: particleos-arch
+        project: home:thefutureisprivate:particleve
+        package: particleve-integration
     - trigger_services:
-        project: system:systemd
-        package: particleos-fedora
-    - trigger_services:
-        project: system:systemd
-        package: particleos-ubuntu
-    - trigger_services:
-        project: system:systemd
-        package: particleos-ubuntu-rpi
-    - trigger_services:
-        project: system:systemd:stable
-        package: particleos-arch
-    - trigger_services:
-        project: system:systemd:stable
-        package: particleos-fedora
-    - trigger_services:
-        project: system:systemd:stable
-        package: particleos-ubuntu
-    - trigger_services:
-        project: system:systemd:stable
-        package: particleos-ubuntu-rpi
+        project: home:thefutureisprivate:particleve
+        package: particleve-image
   filters:
     event: push
     branches:
       only:
-        - obs
+        - main

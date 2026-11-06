@@ -1,0 +1,72 @@
+{
+  "schema": 1,
+  "hostname": "particleve-01",
+  "architecture": "x86-64",
+  "cpu_baseline": "x86-64-v2",
+  "minimum_ram_mib": 4096,
+  "recovery_console_confirmed": true,
+  "tpm_policy": "pcr7+signed-pcr11",
+  "console": "console=tty0",
+  "feed": "https://updates.example.invalid/particleve",
+  "admin_ssh_keys": [
+    "REPLACE_WITH_OWNER_SSH_PUBLIC_KEY"
+  ],
+  "disks": [
+    {
+      "role": "a",
+      "path": "/dev/disk/by-id/REPLACE_DISK_A",
+      "serial": "REPLACE_SERIAL_A"
+    },
+    {
+      "role": "b",
+      "path": "/dev/disk/by-id/REPLACE_DISK_B",
+      "serial": "REPLACE_SERIAL_B"
+    }
+  ],
+  "storage": {
+    "esp_mib": 2048,
+    "usr_growth_percent": 30,
+    "swap_mib": 8192,
+    "firmware_staging_mib": 512,
+    "discard": false,
+    "minimum_state_mib": 32768,
+    "reserve_mib": 16384,
+    "reserve_percent": 15,
+    "metadata_max_percent": 85,
+    "degraded_wait_seconds": 30
+  },
+  "network": {
+    "links": [
+      {
+        "name": "mgmt0",
+        "mac": "02:00:00:00:00:01"
+      }
+    ],
+    "bridges": [],
+    "vlans": [],
+    "management": "mgmt0",
+    "addresses": [
+      "192.0.2.10/24",
+      "2001:db8:1::10/64"
+    ],
+    "gateways": [
+      "192.0.2.1",
+      "2001:db8:1::1"
+    ],
+    "dns": [
+      "192.0.2.1"
+    ],
+    "ntp": [
+      "192.0.2.1"
+    ],
+    "allowed_sources": [
+      "192.0.2.0/24",
+      "2001:db8:1::/64"
+    ]
+  },
+  "maintenance": {
+    "start_tolerance_seconds": 60,
+    "graceful_seconds": 300,
+    "restore_seconds": 120
+  }
+}

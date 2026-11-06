@@ -1,0 +1,71 @@
+#!/bin/bash
+set -euo pipefail
+udevadm settle --timeout=30
+mkdir -p /run/particleve-root-probe /sysroot
+lookup() {
+    local paths
+    paths=$(blkid -t "PARTLABEL=ParticleVE-state-$1" -o device || true)
+    test "$(printf '%s\n' "$paths" | sed '/^$/d' | wc -l)" -le 1
+    printf '%s' "$paths"
+}
+start=$SECONDS
+while :; do
+    part_a=$(lookup a)
+    part_b=$(lookup b)
+    if [[ -n $part_a && -n $part_b ]] || (( SECONDS - start >= 30 )); then break; fi
+    sleep 1
+done
+[[ -n $part_a || -n $part_b ]]
+unlock() {
+    /usr/lib/systemd/systemd-cryptsetup attach "particleve-state-$1" "$2" - tpm2-device=auto
+}
+[[ -z $part_a ]] || unlock a "$part_a"
+[[ -z $part_b ]] || unlock b "$part_b"
+scan() {
+    local mapped=()
+    [[ -z $part_a ]] || mapped+=(/dev/mapper/particleve-state-a)
+    [[ -z $part_b ]] || mapped+=(/dev/mapper/particleve-state-b)
+    btrfs device scan "${mapped[@]}"
+    options=ro,rescue=nologreplay
+    [[ -n $part_a && -n $part_b ]] || options+=,degraded
+    mount -t btrfs -o "$options" "${mapped[0]}" /run/particleve-root-probe
+}
+scan
+manifest=/run/particleve-root-probe/var/lib/particleve/installation.json
+wait=$(jq -er '.storage_wait_seconds | select(type == "number" and floor == . and . >= 5 and . <= 120)' "$manifest")
+# A longer installation-selected wait is read from the encrypted root, never an ESP config.
+while [[ -z $part_a || -z $part_b ]] && (( SECONDS - start < wait )); do
+    next_a=$(lookup a)
+    next_b=$(lookup b)
+    if [[ -n $next_a && -n $next_b ]]; then
+        umount /run/particleve-root-probe
+        [[ -n $part_a ]] || unlock a "$next_a"
+        [[ -n $part_b ]] || unlock b "$next_b"
+        part_a=$next_a
+        part_b=$next_b
+        scan
+        break
+    fi
+    sleep 1
+done
+for role in a b; do
+    variable=part_$role
+    partition=${!variable}
+    [[ -n $partition ]] || continue
+    expected=$(jq -er --arg role "$role" '.devices[] | select(.role == $role) | .state_luks_uuid' "$manifest")
+    [[ $(cryptsetup luksUUID "$partition") == "$expected" ]]
+    expected_part=$(jq -er --arg role "$role" '.devices[] | select(.role == $role) | .partitions[] | select(.role == "state") | .uuid' "$manifest")
+    [[ $(blkid -s PARTUUID -o value "$partition") == "$expected_part" ]]
+    [[ $(blkid -s UUID -o value "/dev/mapper/particleve-state-$role") == $(jq -er '.btrfs.uuid' "$manifest") ]]
+done
+umount /run/particleve-root-probe
+# Missing physical state is the only automatic degraded case. Present-but-locked or damaged devices failed above.
+options=rw,compress=zstd:1
+[[ -n $part_a && -n $part_b ]] || options+=,degraded
+source=/dev/mapper/particleve-state-a
+[[ -n $part_a ]] || source=/dev/mapper/particleve-state-b
+mount -t btrfs -o "$options" "$source" /sysroot
+if [[ ! -b /dev/md/particleve-swap ]]; then
+    mdadm --assemble --scan --run --config=/etc/mdadm.conf
+fi
+test -b /dev/md/particleve-swap

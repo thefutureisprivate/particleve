@@ -1,0 +1,435 @@
+"""Linux backend. Disk targets always come from the encrypted installation manifest."""
+
+import json
+import re
+import tempfile
+from contextlib import contextmanager
+from pathlib import Path
+
+from . import inventory
+from .common import (
+    Deferred,
+    Error,
+    atomic_write,
+    digest,
+    hash_file,
+    read_json,
+    require,
+    run,
+    sync_dir,
+    write_json,
+)
+from .release import fetch, transfers, verify_directory
+
+
+def image_version():
+    values = dict(
+        line.split("=", 1) for line in Path("/usr/lib/os-release").read_text().splitlines() if "=" in line
+    )
+    require(values.get("IMAGE_ID", "").strip('"') == "ParticleVE", "this is not a ParticleVE OS")
+    version = values["IMAGE_VERSION"].strip('"')
+    require(re.fullmatch(r"[0-9]{1,6}(?:\.[0-9]{1,6})?", version), "invalid running IMAGE_VERSION")
+    return version
+
+
+class Linux:
+    def __init__(self, config, directory):
+        self.config = config
+        self.directory = Path(directory)
+        self.manifest = read_json(self.directory / "installation.json")
+        require(self.manifest.get("schema") == 1, "unknown installation manifest schema")
+        require(
+            self.manifest["config_sha256"] == digest(config),
+            "host configuration changed; recommission explicitly",
+        )
+        self.cache = self.directory / "releases"
+        self.keyring = "/usr/lib/particleve/trust/releases.gpg"
+        self.certificate = "/usr/lib/particleve/trust/secure-boot.crt"
+
+    def current_version(self):
+        return image_version()
+
+    def boot_id(self):
+        return Path("/proc/sys/kernel/random/boot_id").read_text().strip()
+
+    def check_commissioned(self):
+        if not (self.directory / "commissioned.json").exists():
+            raise Deferred("not commissioned; automatic OS work is disabled")
+        record = read_json(self.directory / "commissioned.json")
+        require(
+            record["installation_sha256"] == digest(self.manifest),
+            "commissioning evidence does not match this host",
+        )
+        require(record["config_sha256"] == digest(self.config), "configuration has not been commissioned")
+
+    def release(self, version=None):
+        if version and (self.cache / version).exists():
+            return verify_directory(self.cache / version, self.keyring, self.certificate)
+        _, manifest = fetch(self.config["feed"], self.cache, self.keyring, self.certificate, version=version)
+        return manifest
+
+    def local_release(self, version):
+        return verify_directory(self.cache / version, self.keyring, self.certificate, artifacts=False)
+
+    def compatibility_approved(self, first, second):
+        if first["persistent_state"] == second["persistent_state"]:
+            return
+        path = self.directory / "compatibility.json"
+        approvals = read_json(path) if path.exists() else []
+        pair = {digest(first), digest(second)}
+        for approval in approvals:
+            if set(approval["release_sha256"]) == pair and approval.get("retained_os_safe") is True:
+                evidence = Path(approval["evidence"])
+                require(
+                    approval.get("approved_by") and evidence.is_file(),
+                    "compatibility approval lacks evidence",
+                )
+                require(hash_file(evidence) == approval["evidence_sha256"], "compatibility evidence changed")
+                return
+        raise Deferred("Persistent-state change needs explicit, tested retained-OS compatibility approval")
+
+    def check_compatibility(self, current, release):
+        self.compatibility_approved(self.local_release(current), release)
+
+    def check_runtime_state(self):
+        current = self.local_release(self.current_version())
+        ledger = self.directory / "runtime-last-started.json"
+        if ledger.exists():
+            previous = self.local_release(read_json(ledger)["image_version"])
+            self.compatibility_approved(previous, current)
+        write_json(
+            ledger, {"image_version": current["version"], "persistent_state": current["persistent_state"]}
+        )
+
+    def disk(self, role):
+        return next(d for d in self.manifest["devices"] if d["role"] == role)
+
+    @contextmanager
+    def esp(self, role):
+        device = self.disk(role)
+        esp = next(p for p in device["partitions"] if p["role"] == "esp")
+        source = Path("/dev/disk/by-partuuid") / esp["uuid"]
+        require(source.exists(), f"ESP {role} is missing")
+        with tempfile.TemporaryDirectory(prefix=f"particleve-esp-{role}-", dir="/run") as temporary:
+            run(["mount", "-t", "vfat", "-o", "rw,nosuid,nodev,noexec,noatime", source, temporary])
+            try:
+                yield Path(temporary)
+            finally:
+                run(["umount", temporary])
+
+    def check_firmware_clear(self):
+        if list(Path("/sys/firmware/efi/efivars").glob("BootNext-*")) or Path("/system-update").exists():
+            raise Deferred("UEFI BootNext or an offline update is staged")
+        result = run(["fwupdmgr", "get-history", "--json"], check=False)
+        require(result.returncode in (0, 2), "fwupd history unavailable; cannot exclude staged firmware")
+        history = json.loads(result.stdout) if result.stdout.strip() else {}
+
+        def pending(value):
+            if isinstance(value, dict):
+                if value.get("UpdateState") in (1, "pending", "needs-reboot"):
+                    return True
+                return any(pending(v) for v in value.values())
+            return isinstance(value, list) and any(pending(v) for v in value)
+
+        if pending(history):
+            raise Deferred("fwupd reports staged firmware")
+        for role in ("a", "b"):
+            with self.esp(role) as esp:
+                if any(esp.glob("EFI/UpdateCapsule/*")) or any(esp.glob("EFI/**/fwupd*.cap")):
+                    raise Deferred(f"ESP {role} contains staged firmware")
+
+    def check_storage(self, *, healthy):
+        from .storage import status
+
+        if healthy:
+            for disk in self.manifest["devices"]:
+                actual = inventory.observe_disk(disk)
+                require(
+                    actual["serial"] == disk["observed"]["serial"]
+                    and actual["size"] == disk["observed"]["size"],
+                    "selected physical disk identity changed",
+                )
+        return status(self.manifest, self.config, healthy=healthy)
+
+    def matching_partition(self, role, release, kind):
+        suffix = {"usr": "", "verity": "_verity", "verity_sig": "_verity_sig"}[kind]
+        label = f"ParticleVE_{release['version']}{suffix}"
+        nodes = inventory.walk(inventory.block_tree(self.disk(role)["path"]))
+        matches = [n for n in nodes if n.get("partlabel") == label]
+        if len(matches) != 1:
+            return None
+        part = matches[0]
+        item = release["artifacts"][kind]
+        if part["partuuid"] != item["partition_uuid"] or part["size"] < item["size"]:
+            return None
+        return part["name"]
+
+    @staticmethod
+    def boot_entries(esp, version):
+        pattern = re.compile(rf"ParticleVE_{re.escape(version)}_x86-64(?:\+(\d+)(?:-\d+)?)?\.efi\Z")
+        return [
+            (p, pattern.fullmatch(p.name))
+            for p in (esp / "EFI/Linux").glob("*.efi")
+            if pattern.fullmatch(p.name)
+        ]
+
+    def verify_disk(self, role, release, *, boot):
+        for kind in ("usr", "verity", "verity_sig"):
+            path = self.matching_partition(role, release, kind)
+            if (
+                not path
+                or hash_file(path, release["artifacts"][kind]["size"]) != release["artifacts"][kind]["sha256"]
+            ):
+                return False
+        if boot:
+            with self.esp(role) as esp:
+                entries = self.boot_entries(esp, release["version"])
+                if len(entries) != 1:
+                    return False
+                path, match = entries[0]
+                if match[1] is not None and int(match[1]) == 0:
+                    return False
+                if hash_file(path) != release["artifacts"]["uki"]["sha256"]:
+                    return False
+                for name in ("EFI/systemd/systemd-bootx64.efi", "EFI/BOOT/BOOTX64.EFI"):
+                    path = esp / name
+                    if not path.is_file() or hash_file(path) != release["artifacts"]["bootloader"]["sha256"]:
+                        return False
+        return True
+
+    def transfer(self, role, release, current):
+        # The coordinator has authenticated the immutable local source, including all raw hashes.
+        source = self.cache / release["version"]
+        with tempfile.TemporaryDirectory(prefix="particleve-transfer-", dir="/run") as temporary:
+            for name, content in transfers(
+                release, disk=self.disk(role)["path"], source=source, current=current
+            ).items():
+                atomic_write(Path(temporary) / name, content.encode())
+            run(
+                [
+                    "/usr/lib/systemd/systemd-sysupdate",
+                    f"--definitions={temporary}",
+                    "update",
+                    release["version"],
+                ],
+                timeout=3600,
+            )
+
+    def expose_boot(self, role, release):
+        with self.esp(role) as esp:
+            entries = self.boot_entries(esp, release["version"])
+            require(len(entries) <= 1, "ambiguous boot entries")
+            if entries:
+                path, match = entries[0]
+                require(
+                    match[1] is None or int(match[1]) > 0, "boot attempts exhausted; release requires review"
+                )
+                require(hash_file(path) == release["artifacts"]["uki"]["sha256"], "existing UKI mismatch")
+            else:
+                item = release["artifacts"]["uki"]
+                source = self.cache / release["version"] / item["file"]
+                # A hidden temporary filename cannot be discovered as a Type 2 boot entry.
+                atomic_write(
+                    esp / f"EFI/Linux/ParticleVE_{release['version']}_x86-64+3.efi", source.read_bytes()
+                )
+            item = release["artifacts"]["bootloader"]
+            source = self.cache / release["version"] / item["file"]
+            for name in ("EFI/systemd/systemd-bootx64.efi", "EFI/BOOT/BOOTX64.EFI"):
+                atomic_write(esp / name, source.read_bytes())
+
+    @staticmethod
+    def default(esp, version):
+        path = esp / "loader/loader.conf"
+        old = (
+            path.read_text().splitlines() if path.exists() else ["timeout 5", "editor no", "auto-entries no"]
+        )
+        lines = [line for line in old if not re.match(r"\s*default\s", line)]
+        lines.append(f"default ParticleVE_{version}_x86-64*.efi")
+        atomic_write(path, ("\n".join(lines) + "\n").encode())
+
+    def protect_current(self, current, candidate):
+        for role in ("a", "b"):
+            with self.esp(role) as esp:
+                require(self.boot_entries(esp, current), f"disk {role} has no current fallback entry")
+                self.default(esp, current)
+                for path in (esp / "EFI/Linux").glob("ParticleVE_*.efi"):
+                    if not any(
+                        self.boot_entries(esp, v) and path in [p for p, _ in self.boot_entries(esp, v)]
+                        for v in (current, candidate)
+                        if v is not None
+                    ):
+                        # Displaced old OS entries must disappear before their slots are reclaimed.
+                        path.unlink()
+                sync_dir(esp / "EFI/Linux")
+
+    def prove_fallback(self, current):
+        release = self.local_release(current)
+        for role in ("a", "b"):
+            for kind in ("usr", "verity", "verity_sig"):
+                path = self.matching_partition(role, release, kind)
+                require(
+                    path
+                    and hash_file(path, release["artifacts"][kind]["size"])
+                    == release["artifacts"][kind]["sha256"],
+                    f"disk {role} no longer has a coherent fallback",
+                )
+            with self.esp(role) as esp:
+                entries = self.boot_entries(esp, current)
+                require(
+                    len(entries) == 1
+                    and (entries[0][1][1] is None or int(entries[0][1][1]) > 0)
+                    and hash_file(entries[0][0]) == release["artifacts"]["uki"]["sha256"],
+                    f"disk {role} fallback UKI is unavailable",
+                )
+
+    def select(self, version):
+        for role in ("a", "b"):
+            with self.esp(role) as esp:
+                self.default(esp, version)
+
+    def conditional_reboot(self, version):
+        # Use the booted ESP's disk for upstream's installed-version comparison.
+        # The two-disk guard has already checked every resource on both paths.
+        current_esp = run(["bootctl", "--print-esp-path"]).stdout.strip()
+        uuid = run(["findmnt", "--noheadings", "--output=UUID", "--target", current_esp]).stdout.strip()
+        candidates = []
+        for role in ("a", "b"):
+            disk = self.disk(role)
+            esp = next(p for p in disk["partitions"] if p["role"] == "esp")
+            observed = run(
+                ["blkid", "-s", "UUID", "-o", "value", f"/dev/disk/by-partuuid/{esp['uuid']}"]
+            ).stdout.strip()
+            if observed == uuid:
+                candidates.append(disk)
+        require(len(candidates) == 1, "cannot identify the currently booted ESP")
+        release = self.local_release(version)
+        with tempfile.TemporaryDirectory(prefix="particleve-reboot-", dir="/run") as temporary:
+            for name, content in transfers(
+                release,
+                disk=candidates[0]["path"],
+                source=self.cache / version,
+                current=self.current_version(),
+            ).items():
+                atomic_write(Path(temporary) / name, content.encode())
+            if run(
+                ["/usr/lib/systemd/systemd-sysupdate", f"--definitions={temporary}", "pending"], check=False
+            ).returncode:
+                return False
+            run(["/usr/lib/systemd/systemd-sysupdate", f"--definitions={temporary}", "reboot"])
+            jobs = run(["systemctl", "list-jobs", "--no-legend", "--no-pager"], timeout=10).stdout
+            state = run(["systemctl", "is-system-running"], check=False, timeout=10).stdout.strip()
+            return "reboot.target" in jobs or state == "stopping"
+
+    def reject(self, version, current):
+        for role in ("a", "b"):
+            try:
+                with self.esp(role) as esp:
+                    self.default(esp, current)
+                    for path, _ in self.boot_entries(esp, version):
+                        path.rename(path.with_suffix(".rejected"))
+            except Error:
+                # Quarantine is already durable; require every returned disk to reconcile before activation.
+                # A failed ESP write must not prevent the compatible surviving OS from starting VMs.
+                continue
+
+    def health(self):
+        self.check_storage(healthy=False)
+        from .accounts import check
+
+        check()
+        require(inventory.kvm_available(), "KVM is unavailable")
+        require(inventory.secure_boot(), "Secure Boot is not enabled")
+        require(Path("/sys/fs/selinux/enforce").read_text().strip() == "1", "SELinux is not enforcing")
+        run(
+            [
+                "systemctl",
+                "is-active",
+                "systemd-networkd.service",
+                "systemd-resolved.service",
+                "particleve-firewall.service",
+            ]
+        )
+        network = json.loads(
+            run(["ip", "--json", "address", "show", "dev", self.config["network"]["management"]]).stdout
+        )
+        actual = {a["local"] for d in network for a in d.get("addr_info", [])}
+        require(
+            {a.split("/")[0] for a in self.config["network"]["addresses"]} <= actual,
+            "management addresses missing",
+        )
+        run(["systemctl", "is-active", "systemd-machined.service"])
+        run(["systemd-vmspawn", "--version"])
+        require(Path("/usr/lib/systemd/system/systemd-vmspawn@.service").exists(), "vmspawn template missing")
+        require(Path("/sys/module/zswap/parameters/enabled").read_text().strip() == "Y", "zswap is disabled")
+        swaps = Path("/proc/swaps").read_text().splitlines()[1:]
+        require(
+            swaps and all("zram" not in line for line in swaps),
+            "encrypted block swap is missing or zram is active",
+        )
+        require(
+            all(
+                Path(line.split()[0]).resolve() == Path("/dev/mapper/particleve-swap").resolve()
+                for line in swaps
+            ),
+            "unexpected swap outside the encrypted swap mirror",
+        )
+        source = run(["findmnt", "--noheadings", "--output=SOURCE", "--target", "/usr"]).stdout.strip()
+        table = run(["dmsetup", "table", source]).stdout
+        require(" verity " in table, "/usr is not protected by dm-verity")
+
+    def accept(self, version):
+        # systemd-bless-boot.service runs after boot-complete.target; do not reset remote counters here.
+        # Only already healthy, verified images can reach boot-complete.target.
+        require(version == self.current_version(), "cannot accept a release that is not running")
+
+    def cleanup_cache(self):
+        # Missing disks make the reference set uncertain; retain everything until both return.
+        if any(not Path(d["path"]).exists() for d in self.manifest["devices"]):
+            return
+        retained = {self.current_version()}
+        for disk in self.manifest["devices"]:
+            for part in inventory.walk(inventory.block_tree(disk["path"])):
+                match = re.fullmatch(
+                    r"ParticleVE_([0-9.]+)(?:_verity(?:_sig)?)?", part.get("partlabel") or ""
+                )
+                if match:
+                    retained.add(match[1])
+        state_path = self.directory / "state.json"
+        if state_path.exists() and (pending := read_json(state_path)["pending"]):
+            retained.add(pending["version"])
+        for directory in self.cache.iterdir():
+            if directory.is_dir() and directory.name not in retained and not directory.name.startswith("."):
+                manifest = self.local_release(directory.name)
+                for item in manifest["artifacts"].values():
+                    (directory / item["file"]).unlink(missing_ok=True)
+                # Keep authenticated metadata for daemon-state/compatibility history.
+
+    def vm_shutdown(self):
+        from .vms import LinuxVMs, Shutdown
+
+        settings = self.config["maintenance"]
+        return Shutdown(
+            self.directory,
+            LinuxVMs(),
+            self.boot_id(),
+            graceful_seconds=settings["graceful_seconds"],
+            restore_seconds=settings["restore_seconds"],
+        )
+
+    def freeze_vms(self):
+        self.vm_shutdown().freeze()
+
+    def stop_vms(self):
+        self.vm_shutdown().stop()
+
+    def assert_no_vms(self):
+        self.vm_shutdown().assert_empty()
+
+    def restore_vms(self):
+        return self.vm_shutdown().recover()
+
+    def recover_vms(self):
+        return self.vm_shutdown().recover()
+
+    def mark_vm_reboot(self):
+        self.vm_shutdown().mark_reboot()

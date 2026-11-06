@@ -1,0 +1,12 @@
+[Unit]
+Description=ParticleVE host management input filtering
+Before=network-pre.target sshd.socket
+Wants=network-pre.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/sbin/nft --file /etc/particleve/host.nft
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

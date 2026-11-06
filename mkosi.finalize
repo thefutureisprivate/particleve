@@ -15,3 +15,9 @@ if [ -d "$BUILDROOT/var/lib/dpkg" ]; then
     mkdir -p "$BUILDROOT/usr/share/factory/var/lib"
     mv "$BUILDROOT/var/lib/dpkg" "$BUILDROOT/usr/share/factory/var/lib/dpkg"
 fi
+
+PYTHONPATH="$SRCDIR" python3 "$SRCDIR/tools/check-build.py" --root / --tree tools
+
+# Validate the installed tree, rather than inferring provenance from requested packages.
+PYTHONPATH="$SRCDIR" python3 "$SRCDIR/tools/check-build.py" --root "$BUILDROOT" \
+    --source-dir "$SRCDIR" --output "$BUILDROOT/usr/lib/particleve/verification.json"

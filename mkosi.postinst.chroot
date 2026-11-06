@@ -50,3 +50,34 @@ EOF
 
 EOF
 )
+
+# ParticleVE additions to ParticleOS's account/PAM and factory-configuration model.
+set -euo pipefail
+test -f /usr/lib/particleve/build.json
+# Audit and SELinux remain enabled. Reproducible defaults are captured by upstream mkosi.finalize.
+install -d /etc/selinux
+cat >/etc/selinux/config <<'EOF'
+SELINUX=enforcing
+SELINUXTYPE=targeted
+EOF
+install -d /etc/systemd/zram-generator.conf.d
+printf '# Deliberately empty: encrypted block swap backs zswap.\n' >/etc/systemd/zram-generator.conf
+ln -s /dev/null /etc/systemd/zram-generator.conf.d/00-disable.conf
+# No independent upstream transfer/installer/reset path may mutate the selected disk pair.
+rm -rf /usr/lib/sysupdate.d /usr/lib/sysupdate.reboot.d /usr/lib/repart.d
+install -d /usr/lib/sysupdate.d
+ln -sf /dev/null /usr/lib/systemd/system/systemd-sysupdate.service
+ln -sf /dev/null /usr/lib/systemd/system/systemd-sysupdate.timer
+ln -sf /dev/null /usr/lib/systemd/system/systemd-sysupdate-reboot.service
+ln -sf /dev/null /usr/lib/systemd/system/systemd-sysupdate-reboot.timer
+ln -sf /dev/null /usr/lib/systemd/system/systemd-repart.service
+systemctl preset-all
+systemctl disable systemd-sysupdate-update.timer systemd-sysupdate-reboot.timer
+# systemd-boot updates are exclusively installed by the two-disk coordinator.
+systemctl mask systemd-boot-update.service
+# Keep the packaged SSH/PAM stack, adding only the required homed account gate.
+# Root remains the independently accessible recovery/bootstrap account.
+for stack in sshd system-auth password-auth; do
+    test -f "/usr/lib/pam.d/$stack"
+    sed -i '1i account requisite pam_exec.so quiet /usr/libexec/particleve-homed-account' "/usr/lib/pam.d/$stack"
+done

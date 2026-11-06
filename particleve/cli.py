@@ -1,0 +1,193 @@
+"""The public command line. Mutating host operations require root."""
+
+import argparse
+import json
+import os
+import sys
+from pathlib import Path
+
+from . import commission, config, install, inventory, network, release
+from .common import Error, digest, lock, read_json, require, run, write_json
+from .coordinator import Coordinator
+from .linux import Linux
+
+
+def parser():
+    p = argparse.ArgumentParser(description="ParticleVE installation and serialized host maintenance")
+    p.add_argument("--config", default="/etc/particleve/host.json")
+    p.add_argument("--state-dir", default="/var/lib/particleve")
+    commands = p.add_subparsers(dest="command", required=True)
+    commands.add_parser("preflight", help="read-only hardware capability report")
+    render = commands.add_parser("render-network")
+    render.add_argument("--output", required=True, help="staging directory, never activated automatically")
+    for name in ("plan", "install"):
+        sub = commands.add_parser(name)
+        sub.add_argument("--release-dir", required=True)
+        sub.add_argument("--keyring", default="/usr/lib/particleve/trust/releases.gpg")
+        sub.add_argument("--certificate", default="/usr/lib/particleve/trust/secure-boot.crt")
+        if name == "plan":
+            sub.add_argument("--output", required=True)
+        else:
+            sub.add_argument("--plan", required=True)
+            sub.add_argument("--confirm", required=True, help="SHA256 of the reviewed disk-erasing plan")
+            sub.add_argument("--recovery-key-file", required=True)
+    prepare = commands.add_parser("prepare")
+    prepare.add_argument(
+        "--manual",
+        action="store_true",
+        help="allow preparation before commissioning; all safety guards still apply",
+    )
+    for name in (
+        "activate",
+        "assess",
+        "runtime-guard",
+        "vm-start-guard",
+        "recover-vms",
+        "finalize-replacement",
+        "check-users",
+        "fail-boot",
+        "status",
+        "disable-automation",
+    ):
+        commands.add_parser(name)
+    maintenance = commands.add_parser("maintenance")
+    maintenance.add_argument("action", choices=("enter", "leave"))
+    maintenance.add_argument("--reason")
+    maintenance.add_argument("--reviewed", action="store_true")
+    commissioning = commands.add_parser("commission")
+    commissioning.add_argument("--evidence", required=True)
+    commissioning.add_argument("--enable", action="store_true")
+    replacement = commands.add_parser("replace-disk")
+    replacement.add_argument("--role", choices=("a", "b"), required=True)
+    replacement.add_argument("--disk", required=True)
+    replacement.add_argument("--serial", required=True)
+    replacement.add_argument("--confirm")
+    replacement.add_argument("--recovery-key-file")
+    return p
+
+
+def execute(args):
+    host = config.validate(
+        read_json(args.config), publication=args.command not in ("preflight", "render-network")
+    )
+    if args.command == "preflight":
+        report = inventory.collect(host)
+        print(json.dumps(report, indent=2))
+        return 0 if report["ok"] else 1
+    if args.command == "render-network":
+        network.write(host, args.output)
+        result = {"output": str(Path(args.output).resolve())}
+    elif args.command == "plan":
+        manifest = release.verify_directory(args.release_dir, args.keyring, args.certificate)
+        proposed = install.plan(host, manifest)
+        write_json(args.output, proposed)
+        result = {"plan": str(Path(args.output).resolve()), "confirmation": proposed["confirmation"]}
+    elif args.command == "install":
+        result = install.install(
+            host,
+            args.release_dir,
+            read_json(args.plan),
+            args.confirm,
+            args.recovery_key_file,
+            keyring=args.keyring,
+            certificate=args.certificate,
+        )
+    else:
+        if args.command != "status":
+            require(os.geteuid() == 0, "host maintenance commands require root")
+        backend = Linux(host, args.state_dir)
+        coordinator = Coordinator(args.state_dir, backend)
+        if args.command == "prepare":
+            result = coordinator.prepare(automatic=not args.manual)
+        elif args.command == "activate":
+            result = coordinator.reboot()
+        elif args.command == "assess":
+            result = coordinator.assess()
+        elif args.command == "runtime-guard":
+            backend.check_storage(healthy=False)
+            coordinator.runtime_guard()
+            result = {"runtime_state": "compatible"}
+        elif args.command == "maintenance":
+            require(args.action != "enter" or args.reason, "maintenance enter requires --reason")
+            result = coordinator.maintenance(
+                args.reason if args.action == "enter" else None, reviewed=args.reviewed
+            )
+        elif args.command == "commission":
+            with lock(args.state_dir):
+                result = commission.commission(backend, args.evidence, enable=args.enable)
+        elif args.command == "disable-automation":
+            with lock(args.state_dir):
+                run(
+                    [
+                        "systemctl",
+                        "disable",
+                        "--now",
+                        "systemd-sysupdate-update.timer",
+                        "particleve-maintenance.timer",
+                    ]
+                )
+                (backend.directory / "commissioned.json").unlink(missing_ok=True)
+            result = {"automation_enabled": False}
+        elif args.command == "vm-start-guard":
+            from .vms import GATE
+
+            require(not GATE.exists(), "VM starts are temporarily inhibited for OS maintenance")
+            require(inventory.kvm_available(), "KVM acceleration is required")
+            result = {"VM_start": "permitted"}
+        elif args.command == "recover-vms":
+            with lock(args.state_dir):
+                result = backend.recover_vms()
+        elif args.command == "finalize-replacement":
+            with lock(args.state_dir):
+                result = install.finalize_replacement(backend)
+        elif args.command == "check-users":
+            from .accounts import check
+
+            result = check()
+        elif args.command == "fail-boot":
+            with lock(args.state_dir):
+                state = coordinator.load()
+                pending = state["pending"]
+                if (
+                    run(["systemctl", "is-active", "--quiet", "boot-complete.target"], check=False).returncode
+                    == 0
+                ):
+                    result = {"boot": "already complete"}
+                elif pending and pending["version"] == backend.current_version():
+                    run(["systemctl", "--no-block", "reboot"])
+                    result = {"failed_candidate": "retry/fallback requested through boot counting"}
+                else:
+                    run(["systemctl", "--no-block", "isolate", "emergency.target"])
+                    result = {"boot_failure": "owner recovery required"}
+        elif args.command == "replace-disk":
+            with lock(args.state_dir):
+                result = install.replace(
+                    host,
+                    backend,
+                    args.role,
+                    {"role": args.role, "path": args.disk, "serial": args.serial},
+                    confirmation=args.confirm,
+                    keyfile=args.recovery_key_file,
+                )
+        else:
+            result = {
+                "state": coordinator.load(),
+                "installation_sha256": digest(backend.manifest),
+                "capacity": backend.check_storage(healthy=False),
+                "commissioned": (backend.directory / "commissioned.json").exists(),
+            }
+    print(json.dumps(result, indent=2))
+    return 0
+
+
+def main():
+    args = parser().parse_args()
+    try:
+        return execute(args)
+    except (Error, OSError, KeyError, ValueError, TypeError, StopIteration) as exc:
+        print(f"particleve: {exc}", file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())
