@@ -2,10 +2,20 @@ import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from particleve.common import Error
-from particleve.confinement import CONTROLLER, context, private_directory, start_guard, verify_processes
+from particleve.confinement import (
+    CONTROLLER,
+    PTY_ALLOC,
+    PTY_TYPE,
+    QEMU_HANDOFF,
+    context,
+    private_directory,
+    qemu_handoff,
+    start_guard,
+    verify_processes,
+)
 
 
 class ConfinementTests(unittest.TestCase):
@@ -42,6 +52,7 @@ class ConfinementTests(unittest.TestCase):
                 with (
                     patch("particleve.confinement.os.geteuid", return_value=0),
                     patch("particleve.confinement.os.access", return_value=True),
+                    patch("particleve.confinement.shutil.which", return_value=QEMU_HANDOFF),
                     patch("particleve.confinement.GATE") as gate,
                     patch("particleve.confinement.MACHINES", machines),
                     patch("particleve.confinement.RUNTIME", runtime),
@@ -61,6 +72,77 @@ class ConfinementTests(unittest.TestCase):
                         start_guard("test")
                         self.assertEqual(relabel.call_args.args[0], runtime / "test")
                         self.assertEqual(relabel.call_count, 1)
+
+    def test_handoff_labels_only_quarantined_console_and_preserves_native_arguments(self):
+        target = f"system_u:object_r:{PTY_TYPE}:s0:c10,c20"
+        selinux = Mock()
+        selinux.fgetfilecon.side_effect = [(1, PTY_ALLOC), (1, target), (1, target)]
+        selinux.fsetfilecon.return_value = 0
+        arguments = ["-add-fd", "fd=7,set=1", "-netdev", "tap,fd=8"]
+        with (
+            patch.object(Path, "read_text", return_value="0::/machine.slice/systemd-vmspawn@test.service"),
+            patch("particleve.confinement.start_guard", return_value=(10, 20)) as guard,
+            patch("particleve.confinement.os.isatty", side_effect=[True, True, False]),
+            patch.dict("sys.modules", selinux=selinux),
+            patch("particleve.confinement.os.execv") as execute,
+        ):
+            qemu_handoff(arguments)
+        guard.assert_called_once_with("test")
+        selinux.fsetfilecon.assert_called_once_with(0, target)
+        execute.assert_called_once_with("/usr/bin/qemu-kvm", ["/usr/bin/qemu-kvm", *arguments])
+
+    def test_handoff_rejects_foreign_unlabelled_and_failed_console_labels(self):
+        target = f"system_u:object_r:{PTY_TYPE}:s0:c10,c20"
+        for values in (
+            [(1, f"system_u:object_r:{PTY_TYPE}:s0:c30,c40")],
+            [(1, f"system_u:object_r:{PTY_TYPE}:s0")],
+            [(1, "system_u:object_r:devpts_t:s0")],
+            [(-1, "")],
+            [(1, PTY_ALLOC), (-1, target)],
+        ):
+            selinux = Mock()
+            selinux.fgetfilecon.side_effect = values
+            selinux.fsetfilecon.return_value = 0
+            with (
+                self.subTest(values=values),
+                patch.object(Path, "read_text", return_value="0::/systemd-vmspawn@test.service"),
+                patch("particleve.confinement.start_guard", return_value=(10, 20)),
+                patch("particleve.confinement.os.isatty", return_value=True),
+                patch.dict("sys.modules", selinux=selinux),
+                patch("particleve.confinement.os.execv") as execute,
+                self.assertRaises(Error),
+            ):
+                qemu_handoff([])
+            execute.assert_not_called()
+            if values[0][1] != PTY_ALLOC:
+                selinux.fsetfilecon.assert_not_called()
+
+    def test_handoff_rejects_foreign_unit_before_labelling_or_execution(self):
+        with (
+            patch.object(Path, "read_text", return_value="0::/system.slice/foreign.service"),
+            patch("particleve.confinement.start_guard") as guard,
+            patch("particleve.confinement.os.isatty") as inspect,
+            patch("particleve.confinement.os.execv") as execute,
+            self.assertRaisesRegex(Error, "owning unit"),
+        ):
+            qemu_handoff([])
+        guard.assert_not_called()
+        inspect.assert_not_called()
+        execute.assert_not_called()
+
+    def test_launch_rejects_bypassed_handoff_before_storage_inspection(self):
+        with (
+            patch("particleve.confinement.os.geteuid", return_value=0),
+            patch("particleve.confinement.GATE") as gate,
+            patch("particleve.confinement.os.access", return_value=True),
+            patch("particleve.confinement.shutil.which", return_value="/usr/bin/qemu"),
+            patch.object(Path, "read_text", return_value="1"),
+            patch("particleve.confinement.private_directory") as inspect,
+            self.assertRaisesRegex(Error, "guarded QEMU handoff"),
+        ):
+            gate.exists.return_value = False
+            start_guard("test")
+        inspect.assert_not_called()
 
     def test_mcs_pair_accepts_kernel_canonical_adjacent_range(self):
         for value in ("c10,c20", "c20,c10", "c10.c11"):

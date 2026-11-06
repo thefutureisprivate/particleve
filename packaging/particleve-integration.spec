@@ -11,6 +11,7 @@ BuildRequires:  coreutils
 BuildRequires:  selinux-policy-devel
 BuildRequires:  make
 Requires:       python3 >= 3.14
+Requires:       python3-libselinux
 Requires:       systemd-udev
 Requires:       systemd-container
 Requires:       mdadm
@@ -69,6 +70,7 @@ install -D -m0755 bin/particleve %{buildroot}%{_bindir}/particleve
 install -D -m0755 bin/particleve-homed-account %{buildroot}%{_libexecdir}/particleve-homed-account
 install -D -m0755 bin/particleve-vm-stop %{buildroot}%{_libexecdir}/particleve-vm-stop
 install -D -m0755 bin/particleve-vm-start-guard %{buildroot}%{_libexecdir}/particleve-vm-start-guard
+install -D -m0755 bin/particleve-qemu %{buildroot}%{_libexecdir}/particleve-qemu/qemu
 install -m0644 packaging/selinux/particleve_vmspawn.pp %{buildroot}%{_prefix}/lib/particleve/
 install -d %{buildroot}%{_prefix}/lib/particleve-build/particleve
 install -m0644 particleve/__init__.py particleve/common.py particleve/config.py particleve/release.py \
@@ -81,6 +83,7 @@ install -D -m0755 tools/obs-postoutput %{buildroot}%{_libexecdir}/particleve-obs
 %{_libexecdir}/particleve-homed-account
 %{_libexecdir}/particleve-vm-stop
 %{_libexecdir}/particleve-vm-start-guard
+%{_libexecdir}/particleve-qemu
 %{_prefix}/lib/particleve/particleve_vmspawn.pp
 %{_prefix}/lib/particleve/particleve
 %{_prefix}/lib/particleve/trust

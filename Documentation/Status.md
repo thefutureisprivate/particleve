@@ -91,17 +91,24 @@ Using the exact selected-disk definitions, native vacuum removed only the
 pending signature/verity resources and partial usr resource. The running release
 still authenticated on both disks. Source now performs this native cleanup before
 each required transfer, with the running version protected in the same definitions.
-Per-resource/ESP interruption testing and corrected packaged retry acceptance
-remain in progress. No writable-root or guest-data recovery/migration is involved.
+All twelve A/B signature, verity, usr, UKI, bootloader and fallback-loader
+interruption boundaries passed on 42.1 while preparing 43.1. The retained sets
+authenticated, incomplete candidates remained unreferenced, and running guest
+invocations stayed unchanged. These tests used the explicit native vacuum
+prototype; corrected packaged retry acceptance remains in progress. An ordinary
+reboot during preparation preserved pending state and honored disabled guest
+startup policies. No writable-root or guest-data recovery/migration is involved.
 
 ## Native guest console correction
 
 A real read-only serial-console launch exposed missing PTY access despite the
-working headless runtime. Source adds only the PTY multiplexer device and a
-dedicated controller PTY type usable by confined QEMU under its existing MCS
-constraints. Corrected-image console operation and cross-category PTY rejection
-remain to be validated. The disposable prototype unit was restored before the
-failed-boot test; SELinux remained enforcing.
+working headless runtime. Signed 43.1 then launched the native read-only console,
+but inspection found its PTY lacked categories. Source now quarantines newly
+allocated PTYs above every valid VM category pair. A guarded native QEMU handoff
+labels inherited console descriptors with the owning pair before transitioning
+to confined QEMU. It preserves native arguments and descriptors and rejects
+unexpected labels or launch paths. Corrected-image console operation and
+cross-category PTY rejection remain to be validated; SELinux remains enforcing.
 
 ## Scope and remaining validation
 

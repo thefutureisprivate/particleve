@@ -15,6 +15,7 @@ typeattribute swtpm_t mcs_constrained_type;
 
 domtrans_pattern(particleve_vmspawn_t, qemu_exec_t, svirt_t)
 domtrans_pattern(particleve_vmspawn_t, swtpm_exec_t, swtpm_t)
+can_exec(particleve_vmspawn_t, particleve_vmspawn_exec_t)
 
 # Native user-namespace UID/GID maps require these capabilities in the parent namespace.
 allow particleve_vmspawn_t self:capability { setfcap setgid setpcap setuid sys_admin sys_resource };
@@ -50,12 +51,18 @@ dev_rw_null(particleve_vmspawn_t)
 dev_rw_zero(particleve_vmspawn_t)
 udev_read_db(particleve_vmspawn_t)
 
-# Console PTYs belong to the controller's VM category pair. QEMU may use only
-# this dedicated terminal type; its existing MCS constraints separate VM pairs.
+# New PTYs are quarantined above every valid two-category VM until the trusted
+# handoff labels their inherited descriptors with the owning VM's category pair.
+gen_require(`type devpts_t;')
+type particleve_vmspawn_pty_alloc_t;
+dev_node(particleve_vmspawn_pty_alloc_t)
+term_create_pty(particleve_vmspawn_t, particleve_vmspawn_pty_alloc_t)
+range_transition particleve_vmspawn_t devpts_t:chr_file s0:c0.c1023;
+allow particleve_vmspawn_t particleve_vmspawn_pty_alloc_t:chr_file { rw_chr_file_perms setattr relabelfrom };
 type particleve_vmspawn_devpts_t;
 term_pty(particleve_vmspawn_devpts_t)
-term_create_pty(particleve_vmspawn_t, particleve_vmspawn_devpts_t)
-allow particleve_vmspawn_t particleve_vmspawn_devpts_t:chr_file { rw_chr_file_perms setattr };
+allow particleve_vmspawn_devpts_t devpts_t:filesystem associate;
+allow particleve_vmspawn_t particleve_vmspawn_devpts_t:chr_file { rw_chr_file_perms setattr relabelto };
 allow svirt_t particleve_vmspawn_devpts_t:chr_file rw_chr_file_perms;
 
 init_use_fds(particleve_vmspawn_t)

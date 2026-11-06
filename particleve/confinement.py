@@ -2,6 +2,7 @@
 
 import os
 import re
+import shutil
 import stat
 from pathlib import Path
 
@@ -11,6 +12,9 @@ MACHINES = Path("/var/lib/machines")
 RUNTIME = Path("/run/particleve-vm")
 GATE = Path("/run/particleve/vm-start-inhibited")
 CONTROLLER = "particleve_vmspawn_t"
+QEMU_HANDOFF = "/usr/libexec/particleve-qemu/qemu"
+PTY_ALLOC = "system_u:object_r:particleve_vmspawn_pty_alloc_t:s0:c0.c1023"
+PTY_TYPE = "particleve_vmspawn_devpts_t"
 
 
 def context(value, expected_type):
@@ -52,6 +56,7 @@ def start_guard(name):
         Path("/sys/fs/selinux/enforce").read_text().strip() == "1", "VM launch requires SELinux enforcing"
     )
     require(os.access("/dev/kvm", os.R_OK | os.W_OK), "KVM acceleration is required")
+    require(shutil.which("qemu") == QEMU_HANDOFF, "VM launch requires the guarded QEMU handoff")
     require(re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9_.-]*", name) is not None, "invalid VM instance name")
     unit = f"systemd-vmspawn@{name}.service"
     groups = [
@@ -81,6 +86,35 @@ def start_guard(name):
         f"system_u:object_r:qemu_var_run_t:s0:c{first},c{second}\0".encode(),
         follow_symlinks=False,
     )
+    return categories
+
+
+def qemu_handoff(arguments):
+    """Label native console descriptors before the QEMU domain transition."""
+    groups = [
+        line[3:] for line in Path("/proc/self/cgroup").read_text().splitlines() if line.startswith("0::")
+    ]
+    require(len(groups) == 1, "QEMU handoff requires its owning unit")
+    match = re.fullmatch(r"systemd-vmspawn@(.+)\.service", Path(groups[0]).name)
+    require(match is not None, "QEMU handoff requires its owning unit")
+    first, second = start_guard(match[1])
+    target = f"system_u:object_r:{PTY_TYPE}:s0:c{first},c{second}"
+    for fd in (0, 1, 2):
+        if not os.isatty(fd):
+            continue
+        import selinux
+
+        status, current = selinux.fgetfilecon(fd)
+        require(status >= 0, "cannot inspect native console label")
+        if current == PTY_ALLOC:
+            require(selinux.fsetfilecon(fd, target) == 0, "cannot label native console")
+            status, current = selinux.fgetfilecon(fd)
+        require(
+            status >= 0 and context(current, PTY_TYPE) == (first, second),
+            "native console and VM categories differ",
+        )
+    # Preserve native vmspawn's arguments and inherited TAP/QMP/drive descriptors.
+    os.execv("/usr/bin/qemu-kvm", ["/usr/bin/qemu-kvm", *arguments])
 
 
 def verify_processes(processes):
