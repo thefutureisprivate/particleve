@@ -42,6 +42,13 @@ PCR11 authorization:
 particleve enroll-tpm --recovery-key-file /run/owner-recovery-passphrase
 ```
 
+Enrollment explicitly disables automatic pcrlock-policy discovery. It reads back
+the written token and requires SHA256 PCR7, signed PCR11, and no pcrlock or PIN
+before recording success. This is the selected disk-unlock policy; an unrelated
+machine pcrlock policy must not silently add an ESP-local credential dependency.
+Independent recovery slots remain intact. See the native
+[enrollment defaults](https://www.freedesktop.org/software/systemd/man/262/systemd-cryptenroll.html).
+
 The normal initrd has a five-minute boot deadline, cancelled at switch-root.
 Its timer survives emergency isolation. Root discovery allows up to four minutes
 for the independently encrypted state members and their owner recovery prompts.

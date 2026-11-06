@@ -131,11 +131,27 @@ def enroll_source(source, keyfile):
             f"--unlock-key-file={keyfile}",
             "--tpm2-device=auto",
             "--tpm2-pcrs=7",
+            "--tpm2-pcrlock=",
             "--tpm2-public-key=/usr/lib/particleve/trust/pcr-public-key.pem",
             "--tpm2-public-key-pcrs=11",
             source,
         ],
         timeout=300,
+    )
+    tokens = json.loads(run(["cryptsetup", "luksDump", "--dump-json-metadata", source]).stdout)["tokens"]
+    require(
+        any(
+            token.get("type") == "systemd-tpm2"
+            and token.get("tpm2-pcrs") == [7]
+            and token.get("tpm2-pcr-bank") == "sha256"
+            and token.get("tpm2_pubkey_pcrs") == [11]
+            and token.get("tpm2_pubkey")
+            and token.get("keyslots")
+            and not token.get("tpm2_pcrlock", False)
+            and not token.get("tpm2-pin", False)
+            for token in tokens.values()
+        ),
+        "TPM enrollment does not match PCR7 plus signed-PCR11 without pcrlock or PIN",
     )
 
 

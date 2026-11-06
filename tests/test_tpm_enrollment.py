@@ -1,3 +1,4 @@
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -9,6 +10,58 @@ from particleve.common import Error, read_json
 
 
 class TPMEnrollmentTests(unittest.TestCase):
+    def policy(self):
+        return {
+            "type": "systemd-tpm2",
+            "keyslots": ["1"],
+            "tpm2-pcrs": [7],
+            "tpm2-pcr-bank": "sha256",
+            "tpm2_pubkey_pcrs": [11],
+            "tpm2_pubkey": "test public key",
+        }
+
+    def test_enrollment_rejects_implicit_pcrlock_and_unexpected_policy(self):
+        for field, value in (
+            ("tpm2_pcrlock", True),
+            ("tpm2-pin", True),
+            ("tpm2-pcrs", []),
+            ("tpm2_pubkey_pcrs", []),
+        ):
+            token = {**self.policy(), field: value}
+            with (
+                self.subTest(field=field),
+                patch.object(install.inventory, "measured_boot", return_value=True),
+                patch.object(
+                    install,
+                    "run",
+                    side_effect=[
+                        SimpleNamespace(stdout=""),
+                        SimpleNamespace(stdout=json.dumps({"tokens": {"0": token}})),
+                    ],
+                ),
+                self.assertRaisesRegex(Error, "without pcrlock or PIN"),
+            ):
+                install.enroll_source("/dev/disposable", "/run/test-key")
+
+    def test_selected_policy_can_be_added_without_erasing_other_owner_slots(self):
+        tokens = {
+            "0": {**self.policy(), "tpm2_pcrlock": True},
+            "1": {**self.policy(), "keyslots": ["2"]},
+        }
+        with (
+            patch.object(install.inventory, "measured_boot", return_value=True),
+            patch.object(
+                install,
+                "run",
+                side_effect=[
+                    SimpleNamespace(stdout=""),
+                    SimpleNamespace(stdout=json.dumps({"tokens": tokens})),
+                ],
+            ) as commands,
+        ):
+            install.enroll_source("/dev/disposable", "/run/test-key")
+        self.assertFalse(any("wipe-slot" in str(a) for a in commands.call_args_list[0].args[0]))
+
     def test_replacement_crypttab_tracks_new_luks_identity_and_preserves_peer_swap(self):
         manifest = self.backend(Path("/unused")).manifest
         manifest["devices"][0]["state_luks_uuid"] = "replacement-a"
@@ -62,12 +115,21 @@ class TPMEnrollmentTests(unittest.TestCase):
                 patch.object(install.inventory, "secure_boot", return_value=True),
                 patch.object(install.inventory, "measured_boot", return_value=True),
                 patch.object(install, "member", side_effect=lambda d, role: "/dev/test-" + d["role"]),
-                patch.object(install, "run", return_value=SimpleNamespace(stdout="")) as commands,
+                patch.object(
+                    install,
+                    "run",
+                    side_effect=lambda args, **kwargs: SimpleNamespace(
+                        stdout=json.dumps({"tokens": {"0": self.policy()}}) if args[0] == "cryptsetup" else ""
+                    ),
+                ) as commands,
             ):
                 install.enroll_tpm(backend, "/run/test-key", {"pending": None, "maintenance": None})
-            self.assertEqual(len(commands.call_args_list), 3)
-            for call in commands.call_args_list:
+            enrollments = [c for c in commands.call_args_list if c.args[0][0] == "systemd-cryptenroll"]
+            self.assertEqual(len(enrollments), 3)
+            self.assertEqual(len(commands.call_args_list), 6)
+            for call in enrollments:
                 self.assertIn("--tpm2-pcrs=7", call.args[0])
+                self.assertIn("--tpm2-pcrlock=", call.args[0])
                 self.assertIn("--tpm2-public-key-pcrs=11", call.args[0])
                 self.assertFalse(any("wipe-slot" in str(a) for a in call.args[0]))
             record = read_json(directory / "tpm-enrollment.json")

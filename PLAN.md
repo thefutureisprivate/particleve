@@ -336,7 +336,7 @@ Exit: the built image contains the intended package versions and required runtim
 - [x] Implement configurable layout sizing, per-device LUKS2, native Btrfs data/metadata RAID1, `/var`, separate encrypted mirrored swap, and the installation manifest.
 - [x] Omit the separate `/home` partition; disable destructive root reset and automatic writable-root rollback paths.
 - [x] Implement installation and independent ESP setup using explicit disk identities.
-- [x] Enroll and test Secure Boot, verity verification, TPM unlock, and owner recovery.
+- [ ] Enroll and test Secure Boot, verity verification, TPM unlock, and owner recovery.
 - [ ] Validate generic initrd discovery, bounded degraded boot, degraded writes, disk replacement, and restoration of RAID1 profiles and both boot paths.
 
 Exit: either selected boot disk alone boots the intended verified OS and makes encrypted host/guest storage available. The active-`/usr` disk-loss limitation is documented and tested.
