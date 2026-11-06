@@ -53,7 +53,7 @@ def assemble(artifacts, version, root_hash, bootloader, fwupd_efi, verification,
     for kind, source, name in (
         ("uki", uki, uki.name),
         ("bootloader", bootloader, f"ParticleVE_{version}_x86-64.systemd-bootx64.efi"),
-        ("fwupd_efi", fwupd_efi, f"ParticleVE_{version}_x86-64.fwupdx64.efi.signed"),
+        ("fwupd_efi", fwupd_efi, f"ParticleVE_{version}_x86-64.fwupdx64.efi"),
     ):
         manifest["artifacts"][kind] = {
             "file": name,
