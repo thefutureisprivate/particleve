@@ -1,0 +1,11 @@
+<services>
+  <service name="obs_scm">
+    <param name="scm">git</param>
+    <param name="url">https://github.com/thefutureisprivate/particleve.git</param>
+    <param name="revision">main</param>
+    <param name="filename">particleve-build-inputs</param>
+    <param name="without-version">1</param>
+    <param name="extract">packaging/mkosi.spec</param>
+  </service>
+  <service name="download_files" />
+</services>

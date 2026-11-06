@@ -50,10 +50,13 @@ rotation requires an explicitly reviewed overlap, signed releases trusted by the
 installed key, both independent boot paths and TPM recovery testing; no implicit
 trust migration is implemented.
 
+The signed implementation and upstream Git history have been published.
 The source repository is `https://github.com/thefutureisprivate/particleve`, branch
-`main`. `.obs/workflows.yml` describes source-service triggers. Source refresh
-must be wired to the owned repository once publishing access is available; that
-webhook has not yet been established. Dependency rebuilds already use OBS's
+`main`. The four `obs/*/_service` definitions track that branch and extract the relevant
+recipes. Integration tarballs are created by native OBS source services; pinned
+upstream mkosi/fwupd sources are downloaded from their immutable GitHub commit
+URLs. Four package-scoped source-service webhooks avoid granting OBS a GitHub
+personal access token. Their registration remains pending GitHub settings access. Dependency rebuilds already use OBS's
 native repository graph. No permanent external runner is required.
 
 `tools/obs-upload.py` commits reviewed source directories atomically. Its

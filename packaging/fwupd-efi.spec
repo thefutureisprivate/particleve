@@ -1,13 +1,14 @@
 # needssslcertforbuild
 # EFI executables have no installed ELF debug source payload.
 %global debug_package %{nil}
+%global upstream_commit ffeaa10aed8e91f5b8feaefc51faf71b3d034fd3
 Name:           fwupd-efi
 Version:        1.9
 Release:        1%{?dist}
 Summary:        ParticleVE-trusted fwupd EFI capsule helper
 License:        LGPL-2.1-or-later
 URL:            https://github.com/fwupd/fwupd-efi
-Source0:        fwupd-efi-%{version}.tar.xz
+Source0:        https://github.com/fwupd/fwupd-efi/archive/%{upstream_commit}.tar.gz
 Patch0:         fwupd-efi-sbom-linker-message.patch
 ExclusiveArch:  x86_64
 BuildRequires:  gcc
@@ -31,7 +32,7 @@ and separately signed through the OBS PE signing integration. The private key
 stays with OBS. The .signed name resolves to the signed executable.
 
 %prep
-%autosetup -p1
+%autosetup -n fwupd-efi-%{upstream_commit} -p1
 
 %build
 meson setup build --prefix=/usr --libexecdir=libexec --libdir=lib64 \

@@ -8,7 +8,7 @@ have evidence.
 
 | Area | Current evidence | Still required |
 | --- | --- | --- |
-| Source/configuration | Upstream Git history retained locally; Fedora 45 native profile; runtime/initrd/tools stable-systemd inputs; resolved summary checks pass | Publish the prepared branch to the empty owned GitHub repository; source-change webhook |
+| Source/configuration | Full upstream Git history and signed implementation published; Fedora 45 native profile; runtime/initrd/tools stable-systemd inputs; resolved summary checks pass | Publish the remaining build fixes; register source-change webhooks |
 | OBS | Old ParticleOS project deleted before uploads; new owned project and persistent signing key created; separately PE-signed fwupd helper build passed | Integration and pinned mkosi builds passed; complete native image signing/publication, dependency/source rebuild evidence |
 | Host integration | Geometry/stable identity validation, Btrfs RAID1 over per-device LUKS2, md/LUKS swap, independent ESPs, homed/userdb SSH, networkd/nftables, vmspawn template integration | Disposable-disk installation, cold-home SSH, actual initrd/TPM/verity boot, both degraded boot paths and replacement |
 | Update maintenance | Durable lock/version/state, two-disk hash verification, boot counters/quarantine, Berlin window, bounded ACPI shutdown and abort restoration | Real sysupdate/ESP interruptions, boot failure/watchdog/fallback, external startup policy and retained-state compatibility |

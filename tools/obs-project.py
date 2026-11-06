@@ -87,9 +87,4 @@ recipe = (
     + "\n"
 )
 atomic_write(Path(".obs/fedora/x86-64/mkosi.conf"), recipe.encode(), 0o644)
-workflow = "rebuild:\n  steps:\n"
-for package in ("particleve-integration", "particleve-image"):
-    workflow += f"    - trigger_services:\n        project: {project}\n        package: {package}\n"
-workflow += f"  filters:\n    event: push\n    branches:\n      only:\n        - {site['source_branch']}\n"
-atomic_write(Path(".obs/workflows.yml"), workflow.encode(), 0o644)
 print(args.output.resolve())

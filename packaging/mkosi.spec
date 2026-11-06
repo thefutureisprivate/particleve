@@ -1,9 +1,10 @@
+%global upstream_commit a6753e508681aa162cef4e5183f1a728c11c4d78
 Name:           mkosi
 Version:        28~0.git.a6753e508681
 Release:        1%{?dist}
 Summary:        Pinned mkosi for the ParticleVE ParticleOS revision
 License:        LGPL-2.1-or-later
-Source0:        mkosi-particleve.tar.xz
+Source0:        https://github.com/systemd/mkosi/archive/%{upstream_commit}.tar.gz
 BuildArch:      noarch
 BuildRequires:  python3-devel
 BuildRequires:  python3-setuptools
@@ -27,7 +28,7 @@ Requires:       cryptsetup
 Unmodified upstream mkosi at the exact revision recorded in sources.lock.json.
 
 %prep
-%setup -q -n mkosi-particleve
+%setup -q -n mkosi-%{upstream_commit}
 
 %build
 python3 -m build --wheel --no-isolation
