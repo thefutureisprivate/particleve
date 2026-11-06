@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 from particleve import accounts
 from particleve.common import Error
-from particleve.storage import members, profiles
+from particleve.storage import members, present_members, profiles
 
 
 class AccountStorageTests(unittest.TestCase):
@@ -58,6 +58,41 @@ class AccountStorageTests(unittest.TestCase):
             "\tdevid    2 size 10000 used 1000 path /dev/mapper/particleve-state-b\n"
         )
         self.assertEqual([d["devid"] for d in report], [1, 2])
+
+    def test_degraded_inventory_validates_survivor_and_absent_recorded_member(self):
+        manifest = {
+            "devices": [
+                {
+                    "role": role,
+                    "path": f"/dev/disk/by-id/test-{role}",
+                    "btrfs_devid": number,
+                    "state_luks_uuid": f"luks-{role}",
+                    "partitions": [{"role": "state", "uuid": f"state-{role}"}],
+                }
+                for number, role in enumerate(("a", "b"), 1)
+            ]
+        }
+        rows = members(
+            "devid 1 size 0 used 0 path  MISSING\n"
+            "devid 2 size 10000 used 1000 path /dev/mapper/particleve-state-b\n"
+        )
+        with (
+            patch("particleve.storage.Path.exists", return_value=False),
+            patch(
+                "particleve.storage.run",
+                side_effect=[
+                    SimpleNamespace(stdout="luks-b\n"),
+                    SimpleNamespace(stdout="  device: /dev/disk/by-partuuid/state-b\n"),
+                ],
+            ) as commands,
+        ):
+            self.assertEqual(present_members(manifest, rows), [rows[1]])
+            self.assertEqual(commands.call_count, 2)
+        with patch("particleve.storage.Path.exists", return_value=True), self.assertRaises(Error):
+            present_members(manifest, rows)
+        rows[0]["devid"] = 3
+        with self.assertRaisesRegex(Error, "unrecorded"):
+            present_members(manifest, rows)
 
 
 if __name__ == "__main__":

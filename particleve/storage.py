@@ -32,23 +32,31 @@ def members(text):
     ]
 
 
-def status(manifest, config, *, healthy):
-    fsid = manifest["btrfs"]["uuid"]
-    require(Path("/sys/fs/btrfs", fsid).exists(), "recorded Btrfs root is not mounted")
-    allocation = profiles(run(["btrfs", "filesystem", "df", "--raw", "/"]).stdout)
-    devices = members(run(["btrfs", "filesystem", "show", "--raw", "/"]).stdout)
+def present_members(manifest, devices):
     require(1 <= len(devices) <= 2, "Btrfs device inventory is ambiguous")
+    require(len({d["devid"] for d in devices}) == len(devices), "duplicate Btrfs device identity")
+    present = []
     for member in devices:
         matches = [d for d in manifest["devices"] if d["btrfs_devid"] == member["devid"]]
         require(len(matches) == 1, "unrecorded Btrfs device")
         disk = matches[0]
         mapper = f"particleve-state-{disk['role']}"
+        part = next(p for p in disk["partitions"] if p["role"] == "state")
+        underlying = Path("/dev/disk/by-partuuid", part["uuid"])
+        if member["path"] == "MISSING":
+            require(
+                member["size"] == 0
+                and member["used"] == 0
+                and not Path(disk["path"]).exists()
+                and not underlying.exists()
+                and not Path("/dev/mapper", mapper).exists(),
+                "Btrfs missing member conflicts with an available recorded device",
+            )
+            continue
         require(
             Path(member["path"]).resolve() == Path("/dev/mapper", mapper).resolve(),
             "Btrfs device mapping changed",
         )
-        part = next(p for p in disk["partitions"] if p["role"] == "state")
-        underlying = Path("/dev/disk/by-partuuid", part["uuid"])
         require(
             run(["cryptsetup", "luksUUID", underlying]).stdout.strip() == disk["state_luks_uuid"],
             "state LUKS identity changed",
@@ -59,6 +67,16 @@ def status(manifest, config, *, healthy):
             match and Path(match[1]).resolve() == underlying.resolve(),
             "state mapper uses an unexpected partition",
         )
+        present.append(member)
+    require(present, "no recorded Btrfs member is available")
+    return present
+
+
+def status(manifest, config, *, healthy):
+    fsid = manifest["btrfs"]["uuid"]
+    require(Path("/sys/fs/btrfs", fsid).exists(), "recorded Btrfs root is not mounted")
+    allocation = profiles(run(["btrfs", "filesystem", "df", "--raw", "/"]).stdout)
+    devices = present_members(manifest, members(run(["btrfs", "filesystem", "show", "--raw", "/"]).stdout))
     md = Path("/dev/md/particleve-swap")
     require(
         md.exists() and array_uuid("particleve-swap") == manifest["swap"]["md_uuid"],
