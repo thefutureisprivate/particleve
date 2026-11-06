@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 from .common import Deferred, Error, require, run
+from .config import MAINTENANCE_RAM_RESERVE_MIB
 from .inventory import observe_disk
 
 
@@ -51,7 +52,7 @@ def disk_health(selected):
 
 def status(config, selected, *, healthy):
     ram = memory()
-    reserve = config["maintenance"]["minimum_available_ram_mib"] * 1024**2
+    reserve = config["maintenance"].get("minimum_available_ram_mib", MAINTENANCE_RAM_RESERVE_MIB) * 1024**2
     ram["reserve_bytes"] = reserve
     if healthy and ram["available_bytes"] < reserve:
         raise Deferred("physical memory headroom is below the maintenance reserve")

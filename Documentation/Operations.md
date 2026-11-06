@@ -110,7 +110,9 @@ registration, disk/network I/O and restart persistence before commissioning.
 `particleve status` reports durable update/maintenance state, observed storage
 profiles, capacity, errors, swap redundancy, physical memory and selected-disk
 SMART data. Maintenance compares kernel `MemAvailable` with the installation's
-`maintenance.minimum_available_ram_mib`; swap does not count toward that reserve.
+`maintenance.minimum_available_ram_mib` (default 1024); swap does not count toward
+that reserve. Validation never inserts defaults into the installation JSON or
+changes its recorded identity.
 The example's 1024 MiB reserve is a configurable starting point, not a measured
 hardware minimum. Set it from commissioning measurements. Low available RAM or a
 reported SMART fault defers preparation and activation before touching guests.

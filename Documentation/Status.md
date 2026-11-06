@@ -13,7 +13,7 @@ PLAN.md milestones remain open until their complete exit criteria have evidence.
 | Native update | Both authenticated 30.1 sets prepared while host/guest ran; supervised activation gracefully stopped the guest, booted 30.1 unattended, passed assessment/blessing and cleared pending state | Interruption boundaries, refusing/late guests, actual watchdog/fallback and retained-state compatibility |
 | VM recovery | Real concurrent template start refused; real graceful ACPI poweroff, refusal and late-exit reconciliation passed; guest disk/EFI markers and pinned SSH identity survived restart and host update; disabled permanent startup policy was preserved | Multiple-guest and fresh-image shutdown-ordering acceptance |
 | Resources | Btrfs profiles/errors/capacity, swap redundancy, physical RAM availability and selected-disk SMART reporting; memory reserve and SMART-fault maintenance guards; real virtual-disk SMART unavailability reported explicitly | Measured minimum physical RAM, real disk/controller health and pressure acceptance |
-| Checks | Ruff, formatting, shell syntax and 76 tests pass, including disposable GPG verification, native transfer UUIDs, boot blessing, transaction recovery, resource guards and VM shutdown logic | Tests do not establish hardware commissioning |
+| Checks | Ruff, formatting, shell syntax and 77 tests pass, including disposable GPG verification, native transfer UUIDs, boot blessing, transaction recovery, resource guards and VM shutdown logic | Tests do not establish hardware commissioning |
 | Firmware | Signed EFI helper; native device/update discovery; metadata-only refresh; persistent manual-maintenance exclusion | Real supported update/transport, or recorded lack of eligible update; either-disk ESP selection |
 
 ## Scope of the disposable evidence
@@ -39,7 +39,9 @@ then exposed vmspawn's SIGKILL fallback when SSH injection is disabled. A narrow
 template stop helper now sends native ACPI poweroff and waits for all unit
 processes, keeping storage available; ordinary shutdown waits for owner assistance
 if a guest refuses. Automatic maintenance retains its bounded abort/recovery path.
-Fresh-image acceptance of the helper remains required. The signed `/usr`
+The prototype passed normal host shutdown with the helper: all guest processes
+exited cleanly while Btrfs storage was still mounted, with no killing signal in
+that invocation. Fresh-image acceptance of the helper remains required. The signed `/usr`
 remained read-only and SELinux remained enforcing throughout.
 
 Native sysupdate testing exposed explicit path-anchor and compact-UUID filename

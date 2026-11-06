@@ -14,6 +14,7 @@ Requires:       systemd-container
 Requires:       mdadm
 Requires:       cryptsetup
 Requires:       btrfs-progs
+Requires:       smartmontools
 Requires:       gnupg2
 Requires:       sbsigntools
 Requires:       systemd-ukify

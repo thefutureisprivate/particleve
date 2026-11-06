@@ -12,6 +12,7 @@ NAME = re.compile(r"[a-zA-Z][a-zA-Z0-9_-]{0,14}\Z")
 VERSION = re.compile(r"[0-9]{1,6}(?:\.[0-9]{1,6})?\Z")
 STABLE_DISK = re.compile(r"/dev/disk/by-id/[a-zA-Z0-9_.:+-]+\Z")
 VERITY_SIGNATURE_SIZE = 1024 * 1024
+MAINTENANCE_RAM_RESERVE_MIB = 1024
 
 
 def ssh_key(value):
@@ -136,9 +137,10 @@ def validate(config, *, publication=False):
         config["maintenance"]["graceful_seconds"] <= 1800, "graceful shutdown must be bounded to 30 minutes"
     )
     require(config["maintenance"]["restore_seconds"] <= 600, "restoration must be bounded to 10 minutes")
-    integer(config["maintenance"]["minimum_available_ram_mib"], 256, "minimum_available_ram_mib")
+    reserve = config["maintenance"].get("minimum_available_ram_mib", MAINTENANCE_RAM_RESERVE_MIB)
+    integer(reserve, 256, "minimum_available_ram_mib")
     require(
-        config["maintenance"]["minimum_available_ram_mib"] < config["minimum_ram_mib"],
+        reserve < config["minimum_ram_mib"],
         "maintenance RAM reserve must be below the minimum physical RAM",
     )
     require(

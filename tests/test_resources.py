@@ -3,12 +3,24 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from particleve import resources
-from particleve.common import Deferred, Error
+from particleve import config, resources
+from particleve.common import Deferred, Error, digest
 from tests.fixtures import host
 
 
 class ResourceTests(unittest.TestCase):
+    def test_optional_memory_reserve_uses_default_without_changing_installation_identity(self):
+        settings = host()
+        del settings["maintenance"]["minimum_available_ram_mib"]
+        before = digest(settings)
+        config.validate(settings)
+        self.assertEqual(digest(settings), before)
+        with patch.object(
+            resources, "memory", return_value={"total_bytes": 4 * 1024**3, "available_bytes": 2 * 1024**3}
+        ):
+            report = resources.status(settings, [], healthy=True)
+        self.assertEqual(report["memory"]["reserve_bytes"], 1024**3)
+
     def test_memory_reserve_does_not_count_swap(self):
         with patch.object(
             resources.Path,
