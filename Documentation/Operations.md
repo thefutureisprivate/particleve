@@ -100,10 +100,21 @@ subvolume, with normal CoW; the `swtpm-tools` package supplies native TPM
 manufacturing and per-VM certificate setup. Test guest readiness notification,
 registration, disk/network I/O and restart persistence before commissioning.
 
-`particleve status` reports durable update/maintenance state and observed storage
-profiles, capacity, errors and swap redundancy. Keep configured byte/percentage
-reserves available; degraded profiles, errors, resync, replacement or insufficient
-headroom defer automatic work. Root journal storage and update caches are bounded.
+`particleve status` reports durable update/maintenance state, observed storage
+profiles, capacity, errors, swap redundancy, physical memory and selected-disk
+SMART data. Maintenance compares kernel `MemAvailable` with the installation's
+`maintenance.minimum_available_ram_mib`; swap does not count toward that reserve.
+The example's 1024 MiB reserve is a configurable starting point, not a measured
+hardware minimum. Set it from commissioning measurements. Low available RAM or a
+reported SMART fault defers preparation and activation before touching guests.
+SMART queries are read-only and use each recorded whole-disk identity. Device
+errors, unsupported transports and virtual disks with no SMART data appear as
+`unavailable`, never as passed. Record those monitoring gaps at commissioning;
+unavailable SMART alone does not block maintenance. Exit-status health bits follow
+the [upstream smartctl interface](https://github.com/smartmontools/smartmontools/blob/main/src/smartctl.8.in).
+Keep configured byte/percentage reserves available; degraded profiles, errors,
+resync, replacement or insufficient headroom defer automatic work. Root journal
+storage and update caches are bounded.
 
 Automatic preparation fixes one signed release version, verifies both explicit
 disk targets and hashes raw readback before exposing either new UKI. Existing

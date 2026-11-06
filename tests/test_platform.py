@@ -58,6 +58,8 @@ class PlatformTests(unittest.TestCase):
             (["disks", 0, "path"], "/dev/sda"),
             (["network", "allowed_sources"], ["0.0.0.0/0"]),
             (["maintenance", "graceful_seconds"], 0),
+            (["maintenance", "minimum_available_ram_mib"], 0),
+            (["maintenance", "minimum_available_ram_mib"], 4096),
             (["storage", "discard"], True),
             (["storage", "minimum_state_mib"], True),
             (["admin_ssh_keys"], ["REPLACE"]),

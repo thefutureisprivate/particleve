@@ -136,6 +136,11 @@ def validate(config, *, publication=False):
         config["maintenance"]["graceful_seconds"] <= 1800, "graceful shutdown must be bounded to 30 minutes"
     )
     require(config["maintenance"]["restore_seconds"] <= 600, "restoration must be bounded to 10 minutes")
+    integer(config["maintenance"]["minimum_available_ram_mib"], 256, "minimum_available_ram_mib")
+    require(
+        config["maintenance"]["minimum_available_ram_mib"] < config["minimum_ram_mib"],
+        "maintenance RAM reserve must be below the minimum physical RAM",
+    )
     require(
         config.get("admin_ssh_keys") and all(ssh_key(k) for k in config["admin_ssh_keys"]),
         "configure owner Ed25519 SSH public keys",

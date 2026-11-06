@@ -208,6 +208,7 @@ def execute(args):
                 "state": coordinator.load(),
                 "installation_sha256": digest(backend.manifest),
                 "capacity": backend.check_storage(healthy=False),
+                "resources": backend.check_resources(healthy=False),
                 "commissioned": (backend.directory / "commissioned.json").exists(),
             }
     print(json.dumps(result, indent=2))

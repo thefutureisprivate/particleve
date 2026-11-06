@@ -80,7 +80,7 @@ class CoordinatorTests(unittest.TestCase):
         self.assertNotIn("reboot", self.backend.calls)
 
     def test_firmware_missing_disk_schema_and_commissioning_block(self):
-        for blocker in ("firmware", "disk", "schema"):
+        for blocker in ("firmware", "disk", "schema", "memory"):
             with self.subTest(blocker=blocker):
                 self.backend.blocked = blocker
                 self.assertEqual(self.coordinator.prepare()["action"], "deferred")
@@ -167,7 +167,7 @@ class CoordinatorTests(unittest.TestCase):
     def test_manual_activation_retains_firmware_storage_and_shutdown_guards(self):
         self.backend.commissioned = False
         self.coordinator.prepare(automatic=False)
-        for blocker in ("firmware", "disk"):
+        for blocker in ("firmware", "disk", "memory"):
             with self.subTest(blocker=blocker):
                 self.backend.blocked = blocker
                 self.assertEqual(self.coordinator.reboot(automatic=False)["action"], "deferred")

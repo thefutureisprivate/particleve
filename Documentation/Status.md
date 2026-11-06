@@ -1,110 +1,81 @@
 # Implementation and validation status
 
-The native ParticleOS fork, installer, storage/update coordination and host
-configuration are implemented in source. This is an uncommissioned candidate;
-unit tests and package builds do not establish boot or hardware acceptance.
-The original PLAN.md milestones remain open until their complete exit criteria
-have evidence.
+ParticleVE is implemented as a native ParticleOS fork with full upstream Git
+history, Fedora 45, stable systemd, dual-disk storage and coordinated updates.
+This is an uncommissioned candidate. Automatic OS timers remain disabled.
+PLAN.md milestones remain open until their complete exit criteria have evidence.
 
-| Area | Current evidence | Still required |
+| Area | Evidence | Remaining acceptance |
 | --- | --- | --- |
-| Source/configuration | Full upstream Git history published; Fedora 45 native profile; runtime/initrd/tools stable-systemd inputs; resolved summary checks pass; all four source-change webhooks exercised | Complete image validation |
-| OBS | Old project deleted before uploads; new project and persistent signing key; all RPM builds passed; 28.1 accepted from the public feed with all six artifacts, GPG index, EFI signatures and UKI checks; rebuilding only the integration RPM produced 26.2 from 26.1 with unchanged Git sources and persistent-state versions | Boot acceptance of the revised runtime configuration |
-| Host integration | Fresh 28.1 installation; repaired prototype passed homed SSH, independent ESP blessing and unattended TPM unlock from each boot disk; Btrfs RAID1 and synchronized md/LUKS swap; unselected marker unchanged | Fresh signed image incorporating all repairs, single-member boots and replacement |
-| Update maintenance | Revised native sysupdate definitions prepared authenticated 30.1 on both disks while 28.1 and a guest ran; real ACPI shutdown, concurrent-start refusal and aborted-maintenance restoration passed; guest disk/EFI markers survived restart | Native activation, interruptions, boot failure/watchdog/fallback, external startup policy and retained-state compatibility |
-| Local checks | Ruff and shell syntax; 67 tests including disposable GPG signatures, dirty-file signature-slot overwrite, final driver retention, inactive required-service detection, private/public configuration modes, authenticated/idempotent ESP blessing, fallback after failed blessing, supervised activation, firewall privilege checks, native host inventory, interrupted transactions and VM failure recovery | Unit tests do not replace normal-boot and hardware acceptance |
-| Firmware | Signed helper package and metadata-only refresh integration; persistent manual-maintenance exclusion | Device discovery/ESP selection and supervised real update, or evidence no eligible update exists |
-| Commissioning | Evidence-bound command; all automatic OS timers disabled by default | Full acceptance matrix, Intel/AMD and controller/NIC variation, measured memory/capacity minima, unattended update and no-update window |
+| Sources and OBS | Four scoped GitHub source hooks exercised; persistent OBS signing; RPMs built; signed public image 30.1 verified; dependency-only integration rebuild produced distinguishable 26.2 with unchanged Git and persistent-state contracts | Complete fresh-image acceptance of the latest source |
+| Native boot | Prototype 28.1 booted unattended from either selected ESP with Secure Boot, measured PCR7/11, verity, TPM unlock, SELinux enforcing, homed SSH, RAID1 data/metadata and encrypted mirrored swap | Fresh installation incorporating all repairs; sole-member boots, degraded writes and replacement |
+| Virtualization | Packaged vmspawn template, nested KVM, machined registration, TAP/DHCP, readiness, disk/network I/O and persistent guest EFI state; only raw disk has NOCOW | Guest vTPM and broader runtime/confinement acceptance |
+| Native update | Both authenticated 30.1 sets prepared while host/guest ran; supervised activation gracefully stopped the guest, booted 30.1 unattended, passed assessment/blessing and cleared pending state | Interruption boundaries, refusing/late guests, actual watchdog/fallback and retained-state compatibility |
+| VM recovery | Real concurrent template start refused; real graceful ACPI poweroff and aborted-attempt restoration passed; guest disk/EFI markers and pinned SSH identity survived restart and host update; disabled permanent startup policy was preserved | Multiple-guest refusal/late-exit and shutdown-ordering acceptance |
+| Resources | Btrfs profiles/errors/capacity, swap redundancy, physical RAM availability and selected-disk SMART reporting; memory reserve and SMART-fault maintenance guards; real virtual-disk SMART unavailability reported explicitly | Measured minimum physical RAM, real disk/controller health and pressure acceptance |
+| Checks | Ruff, formatting, shell syntax and 72 tests pass, including disposable GPG verification, native transfer UUIDs, boot blessing, transaction recovery, resource guards and VM shutdown logic | Tests do not establish hardware commissioning |
+| Firmware | Signed EFI helper; native device/update discovery; metadata-only refresh; persistent manual-maintenance exclusion | Real supported update/transport, or recorded lack of eligible update; either-disk ESP selection |
 
-The disposable Fedora recovery VM booted with Secure Boot, nested KVM and SSH.
-Preflight rejected its Fedora libtpms 0.10.2 software TPM because it cannot load
-the project's RSA4096 authorization key. The same VM passed all preflight checks
-with a test-only upstream libtpms build at commit
-`5b7bb9b8da269440dcba3f2f7f4bc40197d3c9e7`, using a custom profile derived from
-`default-v2` with host-disabled algorithms removed, and loaded the actual project
-public key successfully. Production image packages are unchanged.
+## Scope of the disposable evidence
 
-The 26.1 image contains 4,850 kernel modules; its signed normal boot activated
-verity and unlocked both encrypted state members. The initrd then failed because
-mdadm rejects a name-only array definition. Recovery reproduced that rejection;
-assembly with the recorded UUID and explicit swap partition identities passed,
-including single-member startup and restoration to synchronized two-member RAID1.
-The corrected initrd uses that exact-identity path; 27.1 successfully switched
-root and activated encrypted mirrored swap. Unattended TPM unlock remains
-unvalidated.
+The isolated host has two 80 GiB virtio disks, an unselected marker disk, 6 GiB
+configured RAM, nested KVM, a software TPM and disposable enrolled 4 MiB OVMF
+firmware. No physical installation disk or firmware has been modified. The image
+retains generic Intel/AMD and storage/network drivers; this fixture does not prove
+varied hardware support.
 
-With fresh disposable 4 MiB OVMF firmware, Secure Boot, firmware event logging,
-nonzero PCR 7/11 and systemd's measured-UKI condition passed. The older 2 MiB test
-firmware exposed a TPM but left those PCRs zero and provided no event log; the
-preflight now rejects that configuration. No measurement checks were bypassed.
+A strict test-only upstream libtpms build was needed for the project's RSA4096
+TPM authorization key. Fedora libtpms 0.10.2 correctly failed the capability
+preflight. Older 2 MiB test firmware exposed no event log or nonzero PCR7/11 and
+was rejected. Production TPM packages and measurement requirements were unchanged.
+All original owner recovery slots were tested after TPM enrollment.
 
-The writable-root prototype verified a fresh inactive homed subvolume account:
-the SSH key alone was rejected, key-plus-password authentication through native
-PAM activated its home, a remote command wrote there, and cleanup removed the
-account. Upstream 262 requires an activation credential even for subvolume homes.
-Keyboard-interactive authentication lost the home reference between OpenSSH
-processes; native password authentication retained it. Root remains key-only.
-These tests used writable prototype SSH/network configuration on 27.1; they do
-not establish unattended first boot of the revised image. Native boot blessing
-also exposed missing SELinux file permissions on selected ESPs; the narrow image
-policy and explicit ESP selection still need a signed-image boot test.
+28.1 is a repaired writable-root prototype. First boot exposed an audit factory
+symlink label, early firewall ordering, inconsistent ESP mount contexts and
+already-good boot blessing behavior. Source fixes all four; a fresh complete
+image must pass without those writable fixture repairs. The prototype also used
+the revised DHCP input policy before restarting its guest. The signed `/usr`
+remained read-only and SELinux remained enforcing throughout.
 
-28.1 installed on a fresh disposable pair with preseeded machine identity, the
-headless target, readable network configuration, RAID1 data/metadata/system and
-clean mirrored swap; the unselected disk remained unchanged. Its first boot
-skipped the interactive setup prompts and reached normal userspace. Assessment
-then correctly rejected inactive auditd: SELinux denied reading the `/etc/audit`
-symlink. The journal also exposed a firewall/socket ordering cycle. Source now
-uses the ordinary `/etc` link type for both audit/SELinux factory links and early
-firewall dependencies, and verifies the full multi-user transaction during image
-builds. Fresh-boot acceptance remains open until those corrections pass.
+Native sysupdate testing exposed explicit path-anchor and compact-UUID filename
+capture defects. Source now uses root-relative absolute paths and authenticated
+explicit partition UUIDs. Corrected definitions were exercised in process memory
+on 28.1; an earlier inactive diagnostic slot was repaired only after payload and
+fallback verification. No retained-data migration was added.
 
-With those two writable fixture repairs, 28.1 passed assessment and its native
-homed cold-home SSH test. Native blessing then exposed an existing GPT-generated
-ESP mount with a conflicting FAT SELinux context. Applying uniform mount options
-made the stock blessing service succeed with enforcement enabled; source now
-aligns all standard ESP mount locations. The software TPM subsequently enrolled
-both state volumes and mirrored swap with PCR7 plus signed PCR11; all original
-recovery slots still unlocked. A cold boot unlocked storage without console input
-or a recovery credential in `/run`. Repeating native blessing then failed because
-the UKI was already good and had no counter. Source now treats an authenticated
-already-good current entry as success without invoking native counter mutation.
-Independent disk boot and a fresh image incorporating all repairs remain required.
-These prototype results do not establish fresh-image acceptance.
+Supervised activation used the OBS-signed integration 30.1 RPM's 18 Python modules
+in a private temporary directory, verified against the project key and published
+source 74fe527. It retained every disk, firmware, compatibility and graceful VM
+shutdown guard; no commissioning evidence or automatic enablement was forged.
+The actual 28.1-to-30.1 boot passed native assessment and blessing and reconciled
+the shutdown ledger. This does not establish production fallback: the older
+28.1 image has the already-good blessing defect described above.
 
-The prototype subsequently booted from disk B without credential input and passed
-assessment, native blessing and runtime gating; both ESP entries are now good.
-A disposable Fedora guest runs through the packaged vmspawn template using KVM,
-TAP networking, guest readiness notification and persistent EFI state. Only its
-raw disk has NOCOW. Real testing found the missing `swtpm-tools` dependency, a
-DHCP request blocked by host-input filtering, and machinectl's need for repeated
-property options. Source addresses these and passed live native firewall/inventory
-checks. Guest vTPM, guest I/O/restart and maintenance acceptance remain open.
-The packaged VM processes currently run in `unconfined_service_t`; global SELinux
-enforcement alone does not establish guest process confinement. Commissioning
-must review that upstream policy coverage. Virtual disks expose no SMART data.
+A cold inactive homed subvolume account accepted key-plus-password SSH through
+native PAM, activated its home and wrote there; key-only authentication was
+rejected. Root remains key-only and keeps its home on encrypted writable state.
+Non-root login users must come from homed. System service accounts remain native.
 
-Native update testing found two transfer-definition defects: `explicit` path
-anchors required an extra CLI source argument, and compact UUIDs in native
-artifact filenames were not captured by a hyphenated UUID replacement. Definitions
-now anchor absolute paths at the host root and set authenticated partition UUIDs
-directly. One earlier diagnostic transfer's inactive UUIDs were repaired only
-after matching all payload hashes, proving the candidate was unexposed and
-rechecking both current fallback copies. No retained migration was added.
-With revised definitions, native preparation completed both 30.1 OS sets and
-exposed each candidate UKI with three attempts; 28.1 and its guest stayed running.
+Packaged vmspawn/QEMU processes run in `unconfined_service_t`; global enforcing
+mode alone does not establish VM process confinement. Commissioning must review
+that upstream policy coverage. Guest vTPM tools are now explicit image inputs;
+persistent guest vTPM acceptance is still open.
 
-The separate initrd watchdog now uses systemd's initrd presets and survives
-emergency isolation. A real isolation test with the exact revised units, a
-ten-second deadline and poweroff override executed its evidence marker and stopped
-the disposable recovery VM without QMP intervention. Cancellation at switch-root
-and actual five-minute timeout/counter/fallback behavior still require acceptance.
-Negative preflight reported wrong serial and insufficient RAM without changing
-either target's partition-header regions. The real client rejected a one-byte
-tampered EFI helper without any disk write.
+The exact initrd watchdog units survived emergency isolation in a real shortened
+disposable test. Actual normal-boot cancellation, full timeout/counter exhaustion
+and fallback remain unvalidated. Boot from one ESP with both disks present does
+not establish boot with its peer absent or which duplicate `/usr` was selected.
 
-The generic UKI currently uses tty0. A configured serial getty can supply a login
-console, but kernel/initrd messages for arbitrary serial ports have not been
-validated. No supported hardware list or measured minimum RAM is published yet.
-No physical installation disks or firmware have been modified by implementation.
-No persistent-data migration has been added or approved.
+## Commissioning remains disabled
+
+Outstanding work includes a fresh complete baseline, single-member boots and
+replacement, failed-boot/fallback scenarios, native multi-guest refusal/late-exit
+cases, guest vTPM persistence, measured resource minima, Intel/AMD and controller/
+NIC variation, supervised supported firmware maintenance, and unattended update/
+no-update windows. The generic UKI uses tty0; arbitrary serial kernel/initrd
+consoles have not been validated. No supported production hardware list is claimed.
+
+The workspace's ignored `build/acceptance/` directory contains isolated VM state,
+public-key-pinned SSH logs and named evidence receipts. It also contains private
+disposable credentials; do not publish that directory. Source control contains
+only the implementation, public trust and this explicit validation status.

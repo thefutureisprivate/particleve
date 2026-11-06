@@ -35,6 +35,11 @@ def image_version():
 
 
 class Linux:
+    def check_resources(self, *, healthy):
+        from .resources import status
+
+        return status(self.config, self.manifest["devices"], healthy=healthy)
+
     def __init__(self, config, directory):
         self.config = config
         self.directory = Path(directory)

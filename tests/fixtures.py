@@ -119,6 +119,12 @@ class Backend:
         if self.blocked == "disk":
             raise Deferred("missing disk or rebuilding mirror")
 
+    def check_resources(self, *, healthy):
+        from particleve.common import Deferred
+
+        if self.blocked == "memory":
+            raise Deferred("insufficient physical memory headroom")
+
     def release(self, version=None):
         return copy.deepcopy(self.releases[version or self.latest])
 

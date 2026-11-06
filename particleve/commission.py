@@ -72,6 +72,7 @@ def commission(backend, evidence_path, *, enable=False):
     )
     backend.health()
     backend.check_storage(healthy=True)
+    backend.check_resources(healthy=True)
     backend.check_firmware_clear()
     enrollment = read_json(backend.directory / "tpm-enrollment.json")
     require(

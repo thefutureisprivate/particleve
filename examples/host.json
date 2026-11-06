@@ -67,6 +67,7 @@
   "maintenance": {
     "start_tolerance_seconds": 60,
     "graceful_seconds": 300,
-    "restore_seconds": 120
+    "restore_seconds": 120,
+    "minimum_available_ram_mib": 1024
   }
 }

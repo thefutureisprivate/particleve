@@ -49,6 +49,7 @@ class Coordinator:
             self.backend.check_commissioned()
         self.backend.check_firmware_clear()
         self.backend.check_storage(healthy=True)
+        self.backend.check_resources(healthy=True)
 
     def reconcile(self, state):
         pending = state["pending"]
