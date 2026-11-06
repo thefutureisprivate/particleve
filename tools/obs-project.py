@@ -47,7 +47,7 @@ atomic_write(
     b"Prefer: -systemd-standalone-repart -systemd-boot-unsigned\n"
     b'%if "%_repository" == "Fedora_45_images"\nType: mkosi\n'
     b"Repotype: checksumsfile:rawsig staticlinks\nPatterntype: none\n"
-    b"Support: mkosi particleve-build-tools\n%endif\n",
+    b"%endif\n",
     0o644,
 )
 services = ET.Element("services")

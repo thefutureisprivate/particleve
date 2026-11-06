@@ -28,6 +28,11 @@ Requires:       mtools
 Requires:       veritysetup
 Requires:       systemd-repart
 Requires:       systemd-ukify
+Requires:       pesign
+Requires:       nss-tools
+Requires:       cpio
+Requires:       jq
+Requires:       efitools
 
 %description -n particleve-build-tools
 Final artifact verification and metadata assembly within mkosi's native OBS

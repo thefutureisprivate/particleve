@@ -5,5 +5,4 @@ Prefer: -systemd-standalone-repart -systemd-boot-unsigned
 Type: mkosi
 Repotype: checksumsfile:rawsig staticlinks
 Patterntype: none
-Support: mkosi particleve-build-tools
 %endif

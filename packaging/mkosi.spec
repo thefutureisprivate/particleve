@@ -23,9 +23,11 @@ Requires:       perl-Config-IniFiles
 Requires:       bubblewrap
 Requires:       erofs-utils
 Requires:       cryptsetup
+Requires:       particleve-build-tools
 
 %description
-Unmodified upstream mkosi at the exact revision recorded in sources.lock.json.
+Unmodified upstream mkosi at the exact revision recorded in sources.lock.json,
+with the ParticleVE native OBS verification toolchain installed alongside it.
 
 %prep
 %setup -q -n mkosi-%{upstream_commit}
