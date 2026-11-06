@@ -2,9 +2,42 @@
 """Fail a build on inherited desktop/security defaults, wrong origins, or missing host capabilities."""
 
 import re
+import shutil
+import tempfile
 from pathlib import Path
 
 from .common import read_json, require, run, write_json
+
+
+def check_tpm_factory_config(root):
+    """Exercise fresh-root materialization, where packaged /etc files are absent."""
+    names = ("swtpm_setup.conf", "swtpm-localca.conf", "swtpm-localca.options")
+    with tempfile.TemporaryDirectory(prefix="particleve-factory-check-") as directory:
+        probe = Path(directory)
+        (probe / "etc").mkdir()
+        config = probe / "usr/lib/tmpfiles.d/etc.conf"
+        config.parent.mkdir(parents=True)
+        shutil.copyfile(root / "usr/lib/tmpfiles.d/etc.conf", config)
+        factory = probe / "usr/share/factory/etc"
+        factory.mkdir(parents=True)
+        for name in names:
+            shutil.copyfile(root / "usr/share/factory/etc" / name, factory / name)
+        run(
+            [
+                "systemd-tmpfiles",
+                f"--root={probe}",
+                "--create",
+                *(f"--prefix=/etc/{name}" for name in names),
+                "etc.conf",
+            ]
+        )
+        for name in names:
+            link = probe / "etc" / name
+            require(link.is_symlink(), f"fresh root is missing factory link: /etc/{name}")
+            target = link.readlink()
+            target = probe / str(target).lstrip("/") if target.is_absolute() else link.parent / target
+            require(target.resolve().is_relative_to(probe), "factory configuration link escapes its root")
+            require(target.read_bytes() == (factory / name).read_bytes(), "wrong TPM factory configuration")
 
 
 def source_revision(directory):
@@ -141,6 +174,7 @@ def root_check(root, *, tree="usr", output=None):
             "usr/lib/particleve/particleve_vmspawn.pp",
         ):
             require((root / path).exists(), f"missing runtime artifact: {path}")
+        check_tpm_factory_config(root)
         require(
             "pam_systemd_home.so" in (root / "usr/lib/pam.d/system-auth").read_text(),
             "upstream PAM homed integration missing",

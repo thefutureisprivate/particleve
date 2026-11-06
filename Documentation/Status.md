@@ -79,6 +79,17 @@ exit status zero and no forced termination. Signed-image acceptance remains requ
 The new label contract changes the persistent-state compatibility marker;
 existing unconfined VM state is not automatically migrated or relabeled.
 
+Fresh signed 35.1 passed boot assessment/blessing with the confined entrypoint
+labels. Its first guest start exposed missing `/etc/swtpm*` factory links and
+the native setup helper's child-liveness signal check. Source now materializes
+the three public packaged configurations and permits that check only against
+the confined swtpm domain. A native fresh-root build gate exercises the actual
+tmpfiles links rather than checking only that the RPM binaries exist. Final
+signed-image vTPM acceptance remains required.
+The new gate rejected the actual 35.1 factory and accepted the corrected source
+using native tmpfiles in isolated empty roots, without changing the running
+host's configuration or policy.
+
 The fresh 34.1 sole-member test mounted encrypted Btrfs root and degraded swap
 from disk B after the bounded 30-second missing-device wait. Boot then exposed a
 redundant native root-label device job: Btrfs label readiness still required both

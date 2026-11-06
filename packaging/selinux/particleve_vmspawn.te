@@ -78,6 +78,8 @@ allow particleve_vmspawn_t swtpm_t:dir list_dir_perms;
 allow particleve_vmspawn_t swtpm_t:file read_file_perms;
 allow particleve_vmspawn_t swtpm_t:lnk_file read_lnk_file_perms;
 allow particleve_vmspawn_t { svirt_t swtpm_t }:process { getattr signal sigkill };
+# Native swtpm_setup checks that its child is alive before certificate setup.
+allow particleve_vmspawn_t swtpm_t:process signull;
 allow { svirt_t swtpm_t } particleve_vmspawn_t:unix_stream_socket { getattr read write };
 allow svirt_t particleve_vmspawn_t:unix_stream_socket connectto;
 allow swtpm_t particleve_vmspawn_t:fifo_file { getattr write };
