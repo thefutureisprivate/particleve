@@ -30,6 +30,11 @@ PCR11 authorization:
 particleve enroll-tpm --recovery-key-file /run/owner-recovery-passphrase
 ```
 
+The normal initrd has a five-minute boot deadline, cancelled at switch-root.
+If it cannot reach the writable root and verified `/usr`, it requests another
+boot attempt before guest runtime access. Use the independent recovery environment
+for extended repair rather than waiting indefinitely in a failed normal initrd.
+
 The recovery installer deliberately does not bind its own PCR7 measurements.
 Enrollment verifies both installed boot paths and retains all recovery slots.
 Reboot and prove unattended unlock from each disk before commissioning. Both mappings form a single Btrfs filesystem with RAID1 data and

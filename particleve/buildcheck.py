@@ -192,6 +192,19 @@ def root_check(root, *, tree="usr", output=None):
             ],
             timeout=120,
         )
+    elif tree == "initrd":
+        run(
+            [
+                "systemd-analyze",
+                f"--root={root}",
+                "--man=no",
+                "verify",
+                "particleve-initrd-storage.service",
+                "particleve-initrd-watchdog.timer",
+                "particleve-initrd-reboot.service",
+            ],
+            timeout=120,
+        )
     record = {
         "schema": 1,
         "tree": tree,

@@ -1,0 +1,12 @@
+[Unit]
+Description=Bound ParticleVE initrd failures before guest runtime access
+Conflicts=initrd-switch-root.target
+Before=initrd-switch-root.target
+
+[Timer]
+OnBootSec=5min
+AccuracySec=1s
+Unit=particleve-initrd-reboot.service
+
+[Install]
+WantedBy=timers.target

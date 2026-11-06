@@ -28,6 +28,9 @@ regex-style module selector retained no kernel modules. Runtime selection now
 uses mkosi's glob syntax and directory selectors end in `/`; final EROFS checks
 require the boot, storage and Intel/AMD KVM drivers after module filtering.
 Successful normal boot and unattended TPM unlock remain unvalidated.
+The failed initrd also exposed a gap before the normal boot watchdog. A separate
+five-minute initrd deadline now stops at switch-root and retries failed boots;
+actual timeout/counter/fallback behavior still requires acceptance testing.
 
 The generic UKI currently uses tty0. A configured serial getty can supply a login
 console, but kernel/initrd messages for arbitrary serial ports have not been
