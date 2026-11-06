@@ -8,7 +8,7 @@ PLAN.md milestones remain open until their complete exit criteria have evidence.
 | Area | Evidence | Remaining acceptance |
 | --- | --- | --- |
 | Sources and OBS | Four scoped GitHub source hooks exercised; persistent OBS signing; signed public image 34.1 authenticated and installed on fresh disposable disks; dependency-only integration rebuild produced distinguishable 26.2 with unchanged Git and persistent-state contracts | Complete fresh-image acceptance of the latest source |
-| Native boot | Prototype 28.1 booted unattended from either selected ESP with Secure Boot, measured PCR7/11, verity, TPM unlock, SELinux enforcing, homed SSH, RAID1 data/metadata and encrypted mirrored swap | Fresh installation incorporating all repairs; sole-member boots, degraded writes and replacement |
+| Native boot | Fresh 34.1 passed assessment/blessing, factory audit/firewall/SELinux, RAID1 data/metadata and encrypted swap, then rebooted unattended through TPM unlock with its SSH identity preserved | Corrected sole-member boot dependency, degraded writes and replacement; final confined-image acceptance |
 | Virtualization | Packaged vmspawn template, nested KVM, machined registration, TAP/DHCP, readiness, disk/network I/O; dedicated confined controller/QEMU/swtpm prototype preserves disk, EFI and TPM NV markers across native restart | Signed-image confinement acceptance |
 | Native update | Both authenticated 30.1 sets prepared while host/guest ran; supervised activation gracefully stopped the guest, booted 30.1 unattended, passed assessment/blessing and cleared pending state | Interruption boundaries, refusing/late guests, actual watchdog/fallback and retained-state compatibility |
 | VM recovery | Real concurrent template start refused; real graceful ACPI poweroff, refusal and late-exit reconciliation passed; guest disk/EFI markers and pinned SSH identity survived restart and host update; disabled permanent startup policy was preserved | Multiple-guest and fresh-image shutdown-ordering acceptance |
@@ -41,7 +41,8 @@ processes, keeping storage available; ordinary shutdown waits for owner assistan
 if a guest refuses. Automatic maintenance retains its bounded abort/recovery path.
 The prototype passed normal host shutdown with the helper: all guest processes
 exited cleanly while Btrfs storage was still mounted, with no killing signal in
-that invocation. Fresh-image acceptance of the helper remains required. The signed `/usr`
+that invocation. The confined recovery prototype also passed normal unit stop
+with the helper. Fresh-image acceptance remains required. The signed `/usr`
 remained read-only and SELinux remained enforcing throughout.
 
 Native sysupdate testing exposed explicit path-anchor and compact-UUID filename
@@ -77,6 +78,19 @@ confined synchronous stop helper also passed normal unit shutdown with guest
 exit status zero and no forced termination. Signed-image acceptance remains required.
 The new label contract changes the persistent-state compatibility marker;
 existing unconfined VM state is not automatically migrated or relabeled.
+
+The fresh 34.1 sole-member test mounted encrypted Btrfs root and degraded swap
+from disk B after the bounded 30-second missing-device wait. Boot then exposed a
+redundant native root-label device job: Btrfs label readiness still required both
+members even though the validated survivor was mounted. A scoped initrd udev rule
+now marks only ParticleVE's decrypted state members ready; `sysroot.mount`
+requires the validating storage service before it may run. The root-label device
+deadline, storage-service timeout, verified `/usr` discovery and watchdog remain.
+The packaged udev rule was tested with only B decrypted: generic Btrfs readiness
+remained zero while the exact ParticleVE root-label device became active.
+Encrypted unlock now waits for native PCR-phase and early TPM setup. Signed-image
+sole-member and TPM-ordering acceptance remain required. The failed fixture was
+shut down through native console reboot; no guest processes were force-killed.
 
 The exact initrd watchdog units survived emergency isolation in a real shortened
 disposable test. Actual normal-boot cancellation, full timeout/counter exhaustion
