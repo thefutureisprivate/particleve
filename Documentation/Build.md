@@ -5,6 +5,9 @@ or second ParticleOS download is required. `sources.lock.json` pins the upstream
 base, mkosi revision and fwupd-efi. Fedora 45 and the upstream stable systemd
 repository apply to runtime, initrd and build tools. Installed RPM origins and
 family versions are checked during the build, rather than inferred from names.
+The final EROFS payload is also checked for retained boot/storage and Intel/AMD
+KVM drivers, including built-in driver metadata, after mkosi's module filtering.
+Module selectors use the pinned mkosi's glob syntax; directory selectors end in `/`.
 
 `obs/site.json` contains the owned project, source branch, package repository and
 single image feed. `tools/configure-build.py` validates public trust and generates

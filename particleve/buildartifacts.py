@@ -11,6 +11,7 @@ from pathlib import Path
 
 from .common import atomic_write, hash_file, read_json, require, run, write_json
 from .config import VERITY_SIGNATURE_SIZE, VERSION
+from .kernels import verify_modules
 from .release import inspect_uki, validate
 
 
@@ -104,6 +105,7 @@ def postoutput():
         root = work / "usr"
         run(["fsck.erofs", f"--extract={root}", usr[0]], timeout=600)
         verification = read_json(root / "lib/particleve/verification.json")
+        kernel_verification = verify_modules(root / "lib/modules")
         build = read_json(root / "lib/particleve/build.json")
         certificate = root / "lib/particleve/trust/secure-boot.crt"
         actual_cert = Path("/usr/src/packages/SOURCES/_projectcert.crt")
@@ -147,6 +149,7 @@ def postoutput():
         manifest = assemble(
             output, version, root_hash, bootloader, helper, verification, build["sources"], output
         )
+        manifest["kernel_verification"] = kernel_verification
         for kind in ("uki", "bootloader", "fwupd_efi"):
             run(["sbverify", "--cert", certificate, output / manifest["artifacts"][kind]["file"]])
         inspect_uki(ukis[0], manifest)

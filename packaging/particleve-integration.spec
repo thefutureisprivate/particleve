@@ -61,7 +61,7 @@ install -D -m0755 bin/particleve %{buildroot}%{_bindir}/particleve
 install -D -m0755 bin/particleve-homed-account %{buildroot}%{_libexecdir}/particleve-homed-account
 install -d %{buildroot}%{_prefix}/lib/particleve-build/particleve
 install -m0644 particleve/__init__.py particleve/common.py particleve/config.py particleve/release.py \
-    particleve/buildartifacts.py %{buildroot}%{_prefix}/lib/particleve-build/particleve/
+    particleve/kernels.py particleve/buildartifacts.py %{buildroot}%{_prefix}/lib/particleve-build/particleve/
 install -D -m0755 tools/obs-postoutput %{buildroot}%{_libexecdir}/particleve-obs-postoutput
 
 %files

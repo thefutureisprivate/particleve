@@ -71,14 +71,14 @@ def summary_check(summary):
         "build-host hardware pruning is enabled",
     )
     require(
-        main["KernelModules"] == ["/.*/"]
+        main["KernelModules"] == ["*"]
         and {
             "default",
-            "/drivers/scsi",
-            "/drivers/nvme",
-            "/drivers/md",
-            "/drivers/char/tpm",
-            "/drivers/net/ethernet",
+            "/drivers/scsi/",
+            "/drivers/nvme/",
+            "/drivers/md/",
+            "/drivers/char/tpm/",
+            "/drivers/net/ethernet/",
         }
         <= set(main["KernelInitrdModules"]),
         "retain generic kernel and initrd module coverage",
