@@ -35,6 +35,7 @@ SCENARIOS = (
     "firmware_discovery_trust",
     "tpm_recovery",
     "confinement",
+    "homed_ssh",
     "memory_capacity",
 )
 

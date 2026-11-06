@@ -156,6 +156,11 @@
       "result": "not-run",
       "evidence": "REPLACE",
       "sha256": "REPLACE"
+    },
+    "homed_ssh": {
+      "result": "not-run",
+      "evidence": "REPLACE",
+      "sha256": "REPLACE"
     }
   },
   "firmware_flash": {

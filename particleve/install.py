@@ -68,7 +68,10 @@ def validate_plan(config, release, proposed, confirmation):
 
 
 def partition(device):
-    run(["sfdisk", "--lock=yes", "--wipe=always", device["path"]], input=sfdisk_script(device))
+    run(
+        ["sfdisk", "--lock=yes", "--wipe=always", "--wipe-partitions=always", device["path"]],
+        input=sfdisk_script(device),
+    )
     run(["udevadm", "settle"])
 
 
@@ -287,7 +290,7 @@ def install(config, release_directory, proposed, confirmation, keyfile, *, keyri
                     run(["mount", "-t", "erofs", "-o", "ro,loop", raw, usr])
                     try:
                         factory = Path(usr) / "share/factory/etc"
-                        shutil.copytree(factory, root / "etc", symlinks=True)
+                        (root / "etc").mkdir()
                         for name in ("usr", "root", "run", "proc", "sys", "dev", "efi", "tmp", "home"):
                             (root / name).mkdir(exist_ok=True)
                         for name in ("bin", "sbin", "lib", "lib64"):
@@ -297,6 +300,15 @@ def install(config, release_directory, proposed, confirmation, keyfile, *, keyri
                         (root / "var/lib").mkdir(parents=True, exist_ok=True)
                         run(["btrfs", "subvolume", "create", root / "var/lib/machines"])
                         (root / "var/lib/machines").chmod(0o700)
+                        # Let upstream sysusers/tmpfiles materialize writable state
+                        # and links to /usr's current defaults. Copying factory /etc
+                        # would freeze PAM, SSH and trust defaults across OS updates.
+                        run(["mount", "--bind", usr, root / "usr"])
+                        try:
+                            run(["systemd-sysusers", f"--root={root}"])
+                            run(["systemd-tmpfiles", f"--root={root}", "--create"], timeout=300)
+                        finally:
+                            run(["umount", root / "usr"])
                         network.write(config, root)
                         fsid = recorded_storage["btrfs"]["uuid"]
                         fstab = (

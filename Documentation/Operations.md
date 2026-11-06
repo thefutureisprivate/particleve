@@ -34,6 +34,9 @@ The recovery installer deliberately does not bind its own PCR7 measurements.
 Enrollment verifies both installed boot paths and retains all recovery slots.
 Reboot and prove unattended unlock from each disk before commissioning. Both mappings form a single Btrfs filesystem with RAID1 data and
 metadata. The writable root is never factory-reset or rewound during OS fallback.
+Upstream sysusers/tmpfiles initializes it and links generic configuration to
+`/usr/share/factory/etc`, allowing PAM/SSH/trust defaults to follow OS updates.
+Only installation-specific settings are written as persistent overrides.
 `/var` and `/var/lib/machines` are subvolumes. There is no separate home partition
 or VM volume manager. Swap alone uses md RAID1 followed by LUKS2 and block swap.
 The initrd discovers explicit partition labels, checks encrypted installation

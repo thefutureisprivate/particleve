@@ -81,3 +81,6 @@ for stack in sshd system-auth password-auth; do
     test -f "/usr/lib/pam.d/$stack"
     sed -i '1i account requisite pam_exec.so quiet /usr/libexec/particleve-homed-account' "/usr/lib/pam.d/$stack"
 done
+# The configured /usr PAM stack is authoritative; the package's generic factory
+# example must not shadow it when an installed writable root is initialized.
+rm -rf /usr/share/factory/etc/pam.d

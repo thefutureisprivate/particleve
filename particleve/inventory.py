@@ -26,6 +26,9 @@ INSTALL_TOOLS = (
     "sbverify",
     "gpgv",
     "bootctl",
+    "systemd-sysusers",
+    "systemd-tmpfiles",
+    "tpm2_testparms",
     "restorecon",
     "setfiles",
     "veritysetup",
@@ -125,6 +128,7 @@ def collect(config):
             p.read_text().strip() == "2" for p in Path("/sys/class/tpm").glob("tpm*/tpm_version_major")
         ),
     )
+    check("TPM RSA4096 PCR policy", lambda: run(["tpm2_testparms", "rsa4096"]).returncode == 0)
     ram_kib = int(
         next(
             line.split()[1]

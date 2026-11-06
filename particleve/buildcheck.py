@@ -134,17 +134,31 @@ def root_check(root, *, tree="usr", output=None):
         ):
             require((root / path).exists(), f"missing runtime artifact: {path}")
         require(
-            "pam_systemd_home.so" in (root / "etc/authselect/system-auth").read_text(),
+            "pam_systemd_home.so" in (root / "usr/lib/pam.d/system-auth").read_text(),
             "upstream PAM homed integration missing",
         )
         require(
-            "particleve-homed-account" in (root / "etc/authselect/system-auth").read_text(),
+            "particleve-homed-account" in (root / "usr/lib/pam.d/system-auth").read_text(),
             "homed account policy missing",
         )
         require(
             "particleve-homed-account" in (root / "usr/lib/pam.d/sshd").read_text(),
             "SSH must enforce the homed account policy independently of authselect's includes",
         )
+        require(
+            not (root / "usr/share/factory/etc/pam.d").exists(),
+            "generic factory PAM examples would shadow the configured /usr PAM stack",
+        )
+        ssh = (root / "usr/share/factory/etc/ssh/sshd_config.d/05-particleve.conf").read_text()
+        require(
+            "UsePAM yes" in ssh and "userdbctl ssh-authorized-keys %u" in ssh,
+            "generic SSH defaults must activate homed and retrieve keys through upstream userdb",
+        )
+        for file in (root / "usr/lib/tmpfiles.d").glob("*.conf"):
+            require(
+                not re.search(r"^h\S*\s+/var/lib/machines\s+.*\+C", file.read_text(), re.M),
+                "NOCOW must be selected only on individual raw images, not the machines directory",
+            )
         certificate = root / "usr/lib/particleve/trust/secure-boot.crt"
         helpers = list((root / "usr/libexec/fwupd/efi").glob("fwupdx64.efi*"))
         require(helpers, "fwupd EFI helper missing")

@@ -76,13 +76,6 @@ def render(config):
             "[Service]\nExecStart=\n"
             f"ExecStart=-/sbin/agetty --noclear --noreset -o '-p -- \\u' - {baud} vt220\n"
         )
-    files["etc/ssh/sshd_config.d/05-particleve.conf"] = (
-        "UsePAM yes\nPubkeyAuthentication yes\n"
-        "AuthorizedKeysCommand /usr/bin/userdbctl ssh-authorized-keys %u\n"
-        "AuthorizedKeysCommandUser root\n"
-        "PasswordAuthentication no\nKbdInteractiveAuthentication no\nPermitRootLogin prohibit-password\n"
-        "PermitEmptyPasswords no\nX11Forwarding no\nAllowAgentForwarding no\n"
-    )
     return files
 
 

@@ -44,6 +44,10 @@ Public signing identities:
 - Stable-systemd package GPG fingerprint:
   `CF496DFD918C8A3F55C56EBC713BF72732820778`.
 
+The initial PCR authorization certificate uses RSA4096. Capability preflight
+checks TPM support for that policy before disk changes; the TPM2 version alone
+does not establish RSA4096 support.
+
 These public files are in `mkosi.extra/usr/lib/particleve/trust/`. Enroll the
 intended EFI certificate through owner-controlled firmware procedures. A future
 rotation requires an explicitly reviewed overlap, signed releases trusted by the
