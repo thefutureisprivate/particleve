@@ -1,3 +1,4 @@
+import base64
 import json
 import tempfile
 import unittest
@@ -5,11 +6,19 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from particleve import install
-from particleve.common import Error, read_json
+from particleve import commission, install
+from particleve.common import Error, digest, hash_file, read_json, write_json
 
 
 class TPMEnrollmentTests(unittest.TestCase):
+    def setUp(self):
+        original = Path.read_bytes
+
+        def contents(path):
+            return b"test public key" if str(path) == install.TPM_PUBLIC_KEY else original(path)
+
+        self.enterContext(patch.object(Path, "read_bytes", contents))
+
     def policy(self):
         return {
             "type": "systemd-tpm2",
@@ -17,7 +26,7 @@ class TPMEnrollmentTests(unittest.TestCase):
             "tpm2-pcrs": [7],
             "tpm2-pcr-bank": "sha256",
             "tpm2_pubkey_pcrs": [11],
-            "tpm2_pubkey": "test public key",
+            "tpm2_pubkey": base64.b64encode(b"test public key").decode(),
         }
 
     def test_enrollment_rejects_implicit_pcrlock_and_unexpected_policy(self):
@@ -26,6 +35,7 @@ class TPMEnrollmentTests(unittest.TestCase):
             ("tpm2-pin", True),
             ("tpm2-pcrs", []),
             ("tpm2_pubkey_pcrs", []),
+            ("tpm2_pubkey", base64.b64encode(b"another key").decode()),
         ):
             token = {**self.policy(), field: value}
             with (
@@ -61,6 +71,47 @@ class TPMEnrollmentTests(unittest.TestCase):
         ):
             install.enroll_source("/dev/disposable", "/run/test-key")
         self.assertFalse(any("wipe-slot" in str(a) for a in commands.call_args_list[0].args[0]))
+
+    def test_commissioning_rechecks_live_policy_even_with_a_matching_receipt(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            backend = self.backend(directory)
+            backend.health = lambda: None
+            backend.check_resources = lambda **kwargs: None
+            proof = directory / "proof"
+            proof.write_text("disposable unit-test evidence")
+            evidence = {
+                "schema": 1,
+                "approved_by": "test owner",
+                "installation_sha256": digest(backend.manifest),
+                "config_sha256": digest(backend.config),
+                "image_version": "1",
+                "measured_minimum_ram_mib": 2048,
+                "hardware_coverage": "unit test only",
+                "validation_gaps": [],
+                "scenarios": {
+                    name: {"result": "pass", "evidence": str(proof), "sha256": hash_file(proof)}
+                    for name in commission.SCENARIOS
+                },
+                "firmware_flash": {"result": "no-eligible-update", "evidence": str(proof)},
+            }
+            path = directory / "acceptance.json"
+            write_json(path, evidence)
+            write_json(
+                directory / "tpm-enrollment.json",
+                {
+                    "schema": 1,
+                    "policy": backend.config["tpm_policy"],
+                    "luks_uuids": install.enrollment_uuids(backend.manifest),
+                },
+            )
+            with (
+                patch.object(install, "member", side_effect=lambda d, role: "/dev/test-" + d["role"]),
+                patch.object(install, "verify_tpm_policy", side_effect=Error("unexpected live policy")),
+                self.assertRaisesRegex(Error, "unexpected live policy"),
+            ):
+                commission.commission(backend, path)
+            self.assertFalse((directory / "commissioned.json").exists())
 
     def test_replacement_crypttab_tracks_new_luks_identity_and_preserves_peer_swap(self):
         manifest = self.backend(Path("/unused")).manifest

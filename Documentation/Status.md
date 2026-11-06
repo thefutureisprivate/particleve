@@ -19,7 +19,7 @@ commissioning and enabling automation are outside this delivery.
 | Confinement | Actual final-image QEMU probes were denied cross-category VM files, host-private files and an unconfined host-service socket. The socket had matching filesystem categories and permissive DAC. swtpm could access matching-category state and was denied another pair. SELinux remained enforcing. |
 | Shutdown and scheduling | Native synchronous unit shutdown completed with guest exit zero and storage still mounted. Two real confined guests passed refusal, late-exit and interrupted-maintenance recovery: the host stayed running, only the affected stopped guest restarted, and concurrent starts were blocked. The native Berlin calendar retained 04:30 across both DST changes, with no catch-up timer. |
 | Maintenance and resources | Persistent manual maintenance deferred preparation without changing the running guest invocation. Physical RAM, available RAM, Btrfs allocation/errors/capacity and swap redundancy are reported. Virtual-disk SMART was explicitly unavailable. Low-RAM and SMART-fault guards are tested. |
-| Checks | Ruff, formatting, shell syntax and 90 tests pass, including disposable GPG checks, transfer identities, boot blessing, transactions, resources, shutdown and MCS launch contracts. The resolved pinned mkosi configuration passes its build check. |
+| Checks | Ruff, formatting, shell syntax and 91 tests pass, including disposable GPG checks, transfer identities, boot blessing, transactions, resources, shutdown and MCS launch contracts. The resolved pinned mkosi configuration passes its build check. |
 | Firmware | Native fwupd device/update discovery worked and reported no eligible update. The EFI helper is project-signed. Metadata refresh is separate from supervised installation; no firmware installation was performed. |
 
 ## Single-member recovery under test
@@ -65,7 +65,9 @@ policy. Its ESP-local credential was present on B and absent on replacement A.
 
 Source now passes an explicit empty pcrlock option and reads back native token
 metadata before recording success. A qualifying token must contain SHA256 PCR7,
-signed PCR11 authorization and no pcrlock or PIN. Enrollment preserves independent
+signed PCR11 authorization for the immutable configured key, and no pcrlock or
+PIN. Commissioning repeats the live token checks, so an older receipt cannot
+substitute for the selected policy. Enrollment preserves independent
 recovery slots and does not erase other owner slots or migrate user data.
 Native enrollment and unattended boots from both sides with this exact policy
 remain to be validated on the corrected signed image.

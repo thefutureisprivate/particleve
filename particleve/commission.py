@@ -41,7 +41,7 @@ SCENARIOS = (
 
 
 def commission(backend, evidence_path, *, enable=False):
-    from .install import enrollment_uuids
+    from .install import enrollment_uuids, member, verify_tpm_policy
 
     evidence = read_json(evidence_path)
     require(evidence.get("schema") == 1, "unknown acceptance record schema")
@@ -81,6 +81,9 @@ def commission(backend, evidence_path, *, enable=False):
         and enrollment.get("luks_uuids") == enrollment_uuids(backend.manifest),
         "TPM enrollment does not cover this installation; enroll from its verified normal boot",
     )
+    for device in backend.manifest["devices"]:
+        verify_tpm_policy(member(device, "state"))
+    verify_tpm_policy("/dev/md/particleve-swap")
     record = {
         "schema": 1,
         "installation_sha256": digest(backend.manifest),

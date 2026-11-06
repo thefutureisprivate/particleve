@@ -1,5 +1,6 @@
 """Explicit, reviewed installation and disk replacement from an owner recovery environment."""
 
+import base64
 import json
 import os
 import shutil
@@ -14,6 +15,8 @@ from .common import array_uuid, atomic_write, digest, hash_file, lock, read_json
 from .layout import MIB, calculate, sfdisk_script
 from .linux import Linux
 from .release import verify_directory
+
+TPM_PUBLIC_KEY = "/usr/lib/particleve/trust/pcr-public-key.pem"
 
 
 def plan(config, release):
@@ -132,12 +135,17 @@ def enroll_source(source, keyfile):
             "--tpm2-device=auto",
             "--tpm2-pcrs=7",
             "--tpm2-pcrlock=",
-            "--tpm2-public-key=/usr/lib/particleve/trust/pcr-public-key.pem",
+            f"--tpm2-public-key={TPM_PUBLIC_KEY}",
             "--tpm2-public-key-pcrs=11",
             source,
         ],
         timeout=300,
     )
+    verify_tpm_policy(source)
+
+
+def verify_tpm_policy(source):
+    public_key = base64.b64encode(Path(TPM_PUBLIC_KEY).read_bytes()).decode()
     tokens = json.loads(run(["cryptsetup", "luksDump", "--dump-json-metadata", source]).stdout)["tokens"]
     require(
         any(
@@ -145,7 +153,7 @@ def enroll_source(source, keyfile):
             and token.get("tpm2-pcrs") == [7]
             and token.get("tpm2-pcr-bank") == "sha256"
             and token.get("tpm2_pubkey_pcrs") == [11]
-            and token.get("tpm2_pubkey")
+            and token.get("tpm2_pubkey") == public_key
             and token.get("keyslots")
             and not token.get("tpm2_pcrlock", False)
             and not token.get("tpm2-pin", False)
