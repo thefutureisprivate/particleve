@@ -23,7 +23,10 @@ The generated `.obs/fedora/x86-64/mkosi.conf` schedules dependencies from all th
 resolved trees. OBS builds the checkout's root `mkosi.conf`, supplies the advancing
 `CI_CNT.B_CNT` image version, and rebuilds on transitive dependency changes.
 `packaging/` supplies the pinned mkosi, integration/build hooks and separately
-PE-signed fwupd helper. The helper's one documented patch changes a successful
+PE-signed fwupd helper. The pinned mkosi RPM requires the build-tools subpackage,
+so OBS installs the final-verification and native signing tools in its worker;
+image `BuildPackages=` alone schedules downloads without installing those tools.
+The helper's one documented patch changes a successful
 SBOM linker-selection message from warning to informational; compiler warnings
 remain fatal, and SBOM/SBAT sections are checked.
 
@@ -60,7 +63,9 @@ The source repository is `https://github.com/thefutureisprivate/particleve`, bra
 recipes. Integration tarballs are created by native OBS source services; pinned
 upstream mkosi/fwupd sources are downloaded from their immutable GitHub commit
 URLs. Four package-scoped source-service webhooks avoid granting OBS a GitHub
-personal access token. Their registration remains pending GitHub settings access. Dependency rebuilds already use OBS's
+personal access token. All four GitHub registrations were verified by an automatic
+refresh to commit
+`fd52ed982ddb80f8163aa70dd8f35a7ecb1fdf23`. Dependency rebuilds use OBS's
 native repository graph. No permanent external runner is required.
 
 `tools/obs-upload.py` commits reviewed source directories atomically. Its

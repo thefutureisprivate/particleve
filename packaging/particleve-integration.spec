@@ -24,6 +24,7 @@ Requires:       rpm
 Requires:       sbsigntools
 Requires:       openssl
 Requires:       erofs-utils
+Requires:       dosfstools
 Requires:       mtools
 Requires:       veritysetup
 Requires:       systemd-repart
@@ -33,6 +34,10 @@ Requires:       nss-tools
 Requires:       cpio
 Requires:       jq
 Requires:       efitools
+Requires:       tar
+Requires:       zstd
+Requires:       findutils
+Requires:       coreutils
 
 %description -n particleve-build-tools
 Final artifact verification and metadata assembly within mkosi's native OBS
