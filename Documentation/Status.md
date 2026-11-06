@@ -16,6 +16,11 @@ have evidence.
 | Firmware | Signed helper package and metadata-only refresh integration; persistent manual-maintenance exclusion | Device discovery/ESP selection and supervised real update, or evidence no eligible update exists |
 | Commissioning | Evidence-bound command; all automatic OS timers disabled by default | Full acceptance matrix, Intel/AMD and controller/NIC variation, measured memory/capacity minima, unattended update and no-update window |
 
+The disposable Fedora recovery VM booted with Secure Boot, nested KVM and SSH.
+Preflight rejected its Fedora libtpms 0.10.2 software TPM because it cannot load
+the project's RSA4096 authorization key. No test disk has been partitioned. This
+is negative preflight evidence, not a ParticleVE boot/TPM acceptance result.
+
 The generic UKI currently uses tty0. A configured serial getty can supply a login
 console, but kernel/initrd messages for arbitrary serial ports have not been
 validated. No supported hardware list or measured minimum RAM is published yet.

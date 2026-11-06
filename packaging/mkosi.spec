@@ -5,6 +5,7 @@ Release:        1%{?dist}
 Summary:        Pinned mkosi for the ParticleVE ParticleOS revision
 License:        LGPL-2.1-or-later
 Source0:        https://github.com/systemd/mkosi/archive/%{upstream_commit}.tar.gz
+Patch0:         mkosi-obs-continuation.patch
 BuildArch:      noarch
 BuildRequires:  python3-devel
 BuildRequires:  python3-setuptools
@@ -26,14 +27,17 @@ Requires:       cryptsetup
 Requires:       particleve-build-tools
 
 %description
-Unmodified upstream mkosi at the exact revision recorded in sources.lock.json,
-with the ParticleVE native OBS verification toolchain installed alongside it.
+Upstream mkosi at the exact revision recorded in sources.lock.json, with the
+ParticleVE native OBS verification toolchain and a narrow signing-continuation fix.
 
 %prep
-%setup -q -n mkosi-%{upstream_commit}
+%autosetup -p1 -n mkosi-%{upstream_commit}
 
 %build
 python3 -m build --wheel --no-isolation
+
+%check
+bash -n mkosi/resources/mkosi-obs/mkosi.build
 
 %install
 python3 -m installer --destdir=%{buildroot} dist/*.whl
@@ -45,4 +49,4 @@ python3 -m installer --destdir=%{buildroot} dist/*.whl
 
 %changelog
 * Fri Nov 06 2026 ParticleVE maintainers <thefutureisprivate@users.noreply.github.com> - 28~0.git.a6753e508681-1
-- Build the unmodified upstream revision used by the ParticleVE profile.
+- Build the pinned upstream revision with the native OBS continuation fix.

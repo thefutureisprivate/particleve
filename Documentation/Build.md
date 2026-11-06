@@ -2,7 +2,7 @@
 
 This checkout is the ParticleOS fork. Build it directly; no overlay composition
 or second ParticleOS download is required. `sources.lock.json` pins the upstream
-base, unmodified mkosi and fwupd-efi. Fedora 45 and the upstream stable systemd
+base, mkosi revision and fwupd-efi. Fedora 45 and the upstream stable systemd
 repository apply to runtime, initrd and build tools. Installed RPM origins and
 family versions are checked during the build, rather than inferred from names.
 
@@ -26,6 +26,11 @@ resolved trees. OBS builds the checkout's root `mkosi.conf`, supplies the advanc
 PE-signed fwupd helper. The pinned mkosi RPM requires the build-tools subpackage,
 so OBS installs the final-verification and native signing tools in its worker;
 image `BuildPackages=` alone schedules downloads without installing those tools.
+The mkosi patch repairs its native signing continuation: it regenerates stale
+split partitions after verity signing, copies each artifact once, and handles
+absent optional signature classes without diagnostics or empty signing rounds.
+The exact upstream patch application, shell syntax, and file-backed partition
+regeneration were checked locally; the full signing path remains an OBS release gate.
 The helper's one documented patch changes a successful
 SBOM linker-selection message from warning to informational; compiler warnings
 remain fatal, and SBOM/SBAT sections are checked.

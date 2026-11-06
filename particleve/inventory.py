@@ -102,6 +102,12 @@ def kvm_available():
         return False
 
 
+def installer_utilities():
+    missing = [name for name in INSTALL_TOOLS if not shutil.which(name)]
+    require(not missing, "missing installer utilities: " + ", ".join(missing))
+    return True
+
+
 def collect(config):
     checks = []
 
@@ -137,7 +143,7 @@ def collect(config):
         )
     )
     check("physical RAM", lambda: ram_kib // 1024 >= config["minimum_ram_mib"])
-    check("installer utilities", lambda: all(shutil.which(name) for name in INSTALL_TOOLS))
+    check("installer utilities", installer_utilities)
     devices = []
     for selected in config["disks"]:
 
