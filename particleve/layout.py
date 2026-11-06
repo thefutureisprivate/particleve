@@ -3,6 +3,7 @@
 import uuid
 
 from .common import digest, require
+from .config import VERITY_SIGNATURE_SIZE
 
 MIB = 1024**2
 GIB = 1024**3
@@ -40,7 +41,11 @@ def calculate(config, devices, release):
         kind: align(artifacts[kind]["size"] * (100 + storage["usr_growth_percent"]) // 100)
         for kind in ("usr", "verity", "verity_sig")
     }
-    sizes["verity_sig"] = max(sizes["verity_sig"], MIB)
+    require(
+        artifacts["verity_sig"]["size"] == VERITY_SIGNATURE_SIZE,
+        "signature payload must completely cover its fixed partition",
+    )
+    sizes["verity_sig"] = VERITY_SIGNATURE_SIZE
     # Only swap uses mdraid. Writable state is native Btrfs over individually encrypted devices.
     swap = (storage["swap_mib"] + 160) * MIB
     fixed = MIB + esp + 2 * sum(sizes.values()) + swap

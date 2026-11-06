@@ -10,8 +10,16 @@ import uuid
 from pathlib import Path
 
 from .common import atomic_write, hash_file, read_json, require, run, write_json
-from .config import VERSION
+from .config import VERITY_SIGNATURE_SIZE, VERSION
 from .release import inspect_uki, validate
+
+
+def pad_signature_partition(path):
+    # The boot parser requires every byte after the JSON object to be NUL. A
+    # complete fixed-size payload also clears stale bytes when reusing a slot.
+    payload = path.read_bytes().rstrip(b"\0")
+    require(0 < len(payload) <= VERITY_SIGNATURE_SIZE, "invalid signature partition payload size")
+    atomic_write(path, payload.ljust(VERITY_SIGNATURE_SIZE, b"\0"), 0o644)
 
 
 def assemble(artifacts, version, root_hash, bootloader, fwupd_efi, verification, sources, output):
@@ -135,6 +143,7 @@ def postoutput():
         bootloader = work / "systemd-bootx64.efi"
         run(["mcopy", "-i", f"{disk}@@{esps[0]['offset']}", "::EFI/systemd/systemd-bootx64.efi", bootloader])
         helper = root / "libexec/fwupd/efi/fwupdx64.efi.signed"
+        pad_signature_partition(signatures[0])
         manifest = assemble(
             output, version, root_hash, bootloader, helper, verification, build["sources"], output
         )

@@ -11,6 +11,7 @@ from .common import require
 NAME = re.compile(r"[a-zA-Z][a-zA-Z0-9_-]{0,14}\Z")
 VERSION = re.compile(r"[0-9]{1,6}(?:\.[0-9]{1,6})?\Z")
 STABLE_DISK = re.compile(r"/dev/disk/by-id/[a-zA-Z0-9_.:+-]+\Z")
+VERITY_SIGNATURE_SIZE = 1024 * 1024
 
 
 def ssh_key(value):

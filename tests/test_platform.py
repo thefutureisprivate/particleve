@@ -33,6 +33,14 @@ class PlatformTests(unittest.TestCase):
         result = layout.calculate(host(), observed, fixture_release())
         self.assertIn("start=256,", layout.sfdisk_script(result["devices"][0]))
 
+    def test_signature_slots_have_no_unwritten_growth_tail(self):
+        candidate = host()
+        candidate["storage"]["usr_growth_percent"] = 90
+        result = layout.calculate(candidate, devices(), fixture_release())
+        for disk in result["devices"]:
+            signatures = [p for p in disk["partitions"] if p["role"].endswith("_verity_sig")]
+            self.assertEqual([p["size"] for p in signatures], [layout.MIB, layout.MIB])
+
     def test_too_small_duplicate_disk_and_bad_sectors_rejected(self):
         for mutation in ("small", "alias", "sectors"):
             observed = devices()
@@ -82,7 +90,7 @@ class PlatformTests(unittest.TestCase):
     def test_release_requires_complete_immutable_artifacts(self):
         manifest = fixture_release()
         release.validate(manifest)
-        for change in ("traversal", "missing", "state", "uuid", "version"):
+        for change in ("traversal", "missing", "state", "uuid", "signature-size", "version"):
             broken = copy.deepcopy(manifest)
             if change == "traversal":
                 broken["artifacts"]["uki"]["file"] = "../uki.efi"
@@ -92,6 +100,8 @@ class PlatformTests(unittest.TestCase):
                 broken["persistent_state"] = {}
             elif change == "uuid":
                 broken["artifacts"]["usr"]["partition_uuid"] = "00000000-0000-0000-0000-000000000000"
+            elif change == "signature-size":
+                broken["artifacts"]["verity_sig"]["size"] = 3270
             else:
                 broken["version"] = "9999999.9999999"
             with self.subTest(change=change), self.assertRaises(Error):

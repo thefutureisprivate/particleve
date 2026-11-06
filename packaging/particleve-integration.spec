@@ -7,6 +7,7 @@ Source0:        particleve-integration-%{version}.tar.xz
 BuildArch:      noarch
 BuildRequires:  python3 >= 3.14
 BuildRequires:  gnupg2
+BuildRequires:  coreutils
 Requires:       python3 >= 3.14
 Requires:       systemd-udev
 Requires:       systemd-container

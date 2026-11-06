@@ -38,7 +38,7 @@ remain fatal, and SBOM/SBAT sections are checked.
 After the native signing stages attach verity, PCR and PE signatures, the final
 hook verifies the root hash, partition payloads, UKI identity/security policy,
 bootloader, fwupd helper and project certificate. It emits a versioned release
-manifest alongside the six required artifacts. OBS signs its native `SHA256SUMS`
+manifest alongside the six required artifacts. Signature payloads include NUL\npadding to exactly 1 MiB; installed signature slots use that same fixed size.\nThis fully replaces stale contents on slot reuse, as required by the upstream\nsignature parser. The other OS partitions retain their configured growth margin.\nOBS signs its native `SHA256SUMS`
 index, covering the manifest and final artifact bytes. Clients authenticate that
 index and the complete manifest before any disk write. There is no deployment
 or promotion service. Interrupted/incomplete signing stages emit no release

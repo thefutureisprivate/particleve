@@ -8,7 +8,7 @@ import uuid
 from pathlib import Path
 
 from .common import Error, digest, hash_file, read_json, require, run
-from .config import VERSION, https_url, integer, version_key
+from .config import VERITY_SIGNATURE_SIZE, VERSION, https_url, integer, version_key
 
 KINDS = ("usr", "verity", "verity_sig", "uki", "bootloader", "fwupd_efi")
 
@@ -38,6 +38,11 @@ def validate(manifest):
         )
         require(re.fullmatch(r"[0-9a-f]{64}", item["sha256"]), "invalid artifact hash")
         integer(item["size"], 1, f"{kind} size")
+        if kind == "verity_sig":
+            require(
+                item["size"] == VERITY_SIGNATURE_SIZE,
+                "signature payload must completely cover its fixed 1 MiB partition",
+            )
         if kind in ("usr", "verity", "verity_sig"):
             require(
                 str(uuid.UUID(item["partition_uuid"])) == item["partition_uuid"], "invalid partition UUID"
