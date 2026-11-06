@@ -134,6 +134,7 @@ def root_check(root, *, tree="usr", output=None):
             "usr/lib/systemd/system/systemd-vmspawn@.service",
             "usr/share/zoneinfo/Europe/Berlin",
             "usr/libexec/particleve-homed-account",
+            "usr/libexec/particleve-vm-stop",
         ):
             require((root / path).exists(), f"missing runtime artifact: {path}")
         require(

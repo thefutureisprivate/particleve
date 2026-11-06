@@ -1,0 +1,9 @@
+#!/usr/bin/python3 -I
+import sys
+
+sys.path.insert(0, "/usr/lib/particleve")
+from particleve.vms import stop_instance
+
+if len(sys.argv) != 2:
+    raise SystemExit("usage: particleve-vm-stop INSTANCE")
+stop_instance(sys.argv[1])

@@ -61,6 +61,7 @@ install -d %{buildroot}%{_prefix}/lib/particleve/trust
 install -m0644 mkosi.extra/usr/lib/particleve/trust/* %{buildroot}%{_prefix}/lib/particleve/trust/
 install -D -m0755 bin/particleve %{buildroot}%{_bindir}/particleve
 install -D -m0755 bin/particleve-homed-account %{buildroot}%{_libexecdir}/particleve-homed-account
+install -D -m0755 bin/particleve-vm-stop %{buildroot}%{_libexecdir}/particleve-vm-stop
 install -d %{buildroot}%{_prefix}/lib/particleve-build/particleve
 install -m0644 particleve/__init__.py particleve/common.py particleve/config.py particleve/release.py \
     particleve/kernels.py particleve/buildartifacts.py %{buildroot}%{_prefix}/lib/particleve-build/particleve/
@@ -70,6 +71,7 @@ install -D -m0755 tools/obs-postoutput %{buildroot}%{_libexecdir}/particleve-obs
 %license LICENSE
 %{_bindir}/particleve
 %{_libexecdir}/particleve-homed-account
+%{_libexecdir}/particleve-vm-stop
 %{_prefix}/lib/particleve/particleve
 %{_prefix}/lib/particleve/trust
 

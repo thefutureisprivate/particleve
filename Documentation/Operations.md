@@ -94,6 +94,13 @@ compression; scrub cannot detect or repair corruption in those contents. Normal
 host and EFI/vTPM files keep CoW/checksums. Use the exact packaged vmspawn/QEMU
 options supported by the release and record persistent-state paths in acceptance
 evidence. Guest workload provisioning and backups are outside ParticleVE.
+The host's template drop-in sends native ACPI poweroff and waits for every VM
+process before completing a normal unit stop or host shutdown. It uses an
+unbounded stop timeout so a refusing guest needs owner assistance instead of
+falling through to vmspawn's signal handler, which kills QEMU when SSH injection
+is disabled. Keep this synchronous `ExecStop` when overriding VM arguments.
+Automatic maintenance retains its separate bounded refusal/recovery transaction
+while the host is still running; it never enters host shutdown with live VMs.
 The selected native interface supports `--efi-nvram-state=PATH` for a persistent
 file and `--tpm-state=PATH` for a persistent directory. Keep both within that VM's
 subvolume, with normal CoW; the `swtpm-tools` package supplies native TPM

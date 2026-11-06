@@ -6,7 +6,79 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from particleve.common import Deferred, Error, read_json
-from particleve.vms import LinuxVMs, Shutdown
+from particleve.vms import LinuxVMs, Shutdown, stop_instance
+
+
+class NativeStopTests(unittest.TestCase):
+    def test_maintenance_waits_for_stop_helpers_and_detects_new_prestart_invocations(self):
+        entry = {
+            "processes": [],
+            "unit": "systemd-vmspawn@test.service",
+            "invocation": "old",
+            "cgroup": "/unit",
+        }
+        for state, invocation, processes, expected in (
+            ("deactivating", "old", [{"pid": 123}], (True, False)),
+            ("inactive", "", [], (False, False)),
+            ("activating", "new", [{"pid": 456}], (False, True)),
+        ):
+            with (
+                self.subTest(state=state),
+                patch(
+                    "particleve.vms.unit_state",
+                    return_value={"ActiveState": state, "InvocationID": invocation},
+                ),
+                patch("particleve.vms.cgroup_processes", return_value=processes),
+            ):
+                self.assertEqual(LinuxVMs().alive(entry), expected)
+
+    def test_failed_acpi_request_waits_for_all_vm_processes_without_signalling_them(self):
+        with (
+            patch(
+                "particleve.vms.Path.read_text",
+                return_value="0::/machine.slice/systemd-vmspawn@test.service\n",
+            ),
+            patch("particleve.vms.os.getpid", return_value=100),
+            patch(
+                "particleve.vms.cgroup_processes",
+                side_effect=[
+                    [{"pid": 100}, {"pid": 1}, {"pid": 2}],
+                    [{"pid": 100}, {"pid": 1}, {"pid": 2}],
+                    [{"pid": 100}, {"pid": 3}],
+                    [{"pid": 100}],
+                ],
+            ),
+            patch("particleve.vms.run", return_value=SimpleNamespace(returncode=1)) as commands,
+            patch("particleve.vms.time.sleep") as pause,
+            patch("builtins.print") as output,
+        ):
+            stop_instance("test")
+        self.assertEqual(commands.call_args_list[0].args[0], ["machinectl", "poweroff", "--", "test"])
+        self.assertEqual(commands.call_count, 1)
+        self.assertEqual(pause.call_count, 2)
+        self.assertIn("owner-assisted", output.call_args.args[0])
+
+    def test_already_exited_guest_needs_no_poweroff_request(self):
+        with (
+            patch(
+                "particleve.vms.Path.read_text",
+                return_value="0::/machine.slice/systemd-vmspawn@test.service\n",
+            ),
+            patch("particleve.vms.os.getpid", return_value=100),
+            patch("particleve.vms.cgroup_processes", return_value=[{"pid": 100}]),
+            patch("particleve.vms.run") as commands,
+        ):
+            stop_instance("test")
+        commands.assert_not_called()
+
+    def test_helper_cannot_stop_a_different_owning_unit(self):
+        with (
+            patch("particleve.vms.Path.read_text", return_value="0::/system.slice/other.service\n"),
+            patch("particleve.vms.run") as commands,
+            self.assertRaisesRegex(Error, "owning unit"),
+        ):
+            stop_instance("test")
+        commands.assert_not_called()
 
 
 class NativeInventoryTests(unittest.TestCase):

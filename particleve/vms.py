@@ -1,6 +1,7 @@
 """Bounded, reversible maintenance of existing vmspawn units. No VM definitions are created."""
 
 import json
+import os
 import re
 import time
 from pathlib import Path
@@ -70,6 +71,34 @@ def qemu_processes():
             require((identity := process_identity(path.parent.name)) is not None, "QEMU inventory changed")
             result.append(identity)
     return result
+
+
+def stop_instance(name):
+    """ExecStop: wait for native ACPI shutdown before vmspawn receives any signal."""
+    unit = f"systemd-vmspawn@{name}.service"
+    require(UNIT.fullmatch(unit), "invalid vmspawn instance")
+    groups = [
+        line[3:] for line in Path("/proc/self/cgroup").read_text().splitlines() if line.startswith("0::")
+    ]
+    require(len(groups) == 1 and Path(groups[0]).name == unit, "VM stop helper must run in its owning unit")
+
+    def remaining():
+        return [entry for entry in cgroup_processes(groups[0]) if entry["pid"] != os.getpid()]
+
+    if not remaining():
+        return  # A guest which exited on its own needs no further poweroff request.
+    try:
+        result = run(["machinectl", "poweroff", "--", name], check=False, timeout=15)
+        if result.returncode:
+            print("Graceful VM poweroff request failed; waiting for owner-assisted guest exit", flush=True)
+    except Error as exc:
+        print(
+            f"Graceful VM poweroff request failed: {exc}; waiting for owner-assisted guest exit", flush=True
+        )
+    # An ordinary host shutdown must not fall through to vmspawn's SIGKILL fallback.
+    # Automatic maintenance uses its separate bounded Shutdown transaction before reboot.
+    while remaining():
+        time.sleep(1)
 
 
 class LinuxVMs:
@@ -177,8 +206,16 @@ class LinuxVMs:
     def alive(self, entry):
         original = any(process_identity(p["pid"]) == p for p in entry["processes"])
         state = unit_state(entry["unit"])
+        active = bool(cgroup_processes(entry["cgroup"])) or state["ActiveState"] in (
+            "active",
+            "activating",
+            "deactivating",
+        )
+        same = state["InvocationID"] == entry["invocation"]
+        # ExecStop and auxiliary processes must finish too, even after MainPID exits.
+        original = original or (same and active)
         # A new invocation must be left alone during restoration and must abort activation.
-        replacement = bool(int(state["MainPID"])) and state["InvocationID"] != entry["invocation"]
+        replacement = active and not same
         return original, replacement
 
     def poweroff(self, entry):

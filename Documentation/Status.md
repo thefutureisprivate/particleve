@@ -11,9 +11,9 @@ PLAN.md milestones remain open until their complete exit criteria have evidence.
 | Native boot | Prototype 28.1 booted unattended from either selected ESP with Secure Boot, measured PCR7/11, verity, TPM unlock, SELinux enforcing, homed SSH, RAID1 data/metadata and encrypted mirrored swap | Fresh installation incorporating all repairs; sole-member boots, degraded writes and replacement |
 | Virtualization | Packaged vmspawn template, nested KVM, machined registration, TAP/DHCP, readiness, disk/network I/O and persistent guest EFI state; only raw disk has NOCOW | Guest vTPM and broader runtime/confinement acceptance |
 | Native update | Both authenticated 30.1 sets prepared while host/guest ran; supervised activation gracefully stopped the guest, booted 30.1 unattended, passed assessment/blessing and cleared pending state | Interruption boundaries, refusing/late guests, actual watchdog/fallback and retained-state compatibility |
-| VM recovery | Real concurrent template start refused; real graceful ACPI poweroff and aborted-attempt restoration passed; guest disk/EFI markers and pinned SSH identity survived restart and host update; disabled permanent startup policy was preserved | Multiple-guest refusal/late-exit and shutdown-ordering acceptance |
+| VM recovery | Real concurrent template start refused; real graceful ACPI poweroff, refusal and late-exit reconciliation passed; guest disk/EFI markers and pinned SSH identity survived restart and host update; disabled permanent startup policy was preserved | Multiple-guest and fresh-image shutdown-ordering acceptance |
 | Resources | Btrfs profiles/errors/capacity, swap redundancy, physical RAM availability and selected-disk SMART reporting; memory reserve and SMART-fault maintenance guards; real virtual-disk SMART unavailability reported explicitly | Measured minimum physical RAM, real disk/controller health and pressure acceptance |
-| Checks | Ruff, formatting, shell syntax and 72 tests pass, including disposable GPG verification, native transfer UUIDs, boot blessing, transaction recovery, resource guards and VM shutdown logic | Tests do not establish hardware commissioning |
+| Checks | Ruff, formatting, shell syntax and 76 tests pass, including disposable GPG verification, native transfer UUIDs, boot blessing, transaction recovery, resource guards and VM shutdown logic | Tests do not establish hardware commissioning |
 | Firmware | Signed EFI helper; native device/update discovery; metadata-only refresh; persistent manual-maintenance exclusion | Real supported update/transport, or recorded lack of eligible update; either-disk ESP selection |
 
 ## Scope of the disposable evidence
@@ -34,7 +34,12 @@ All original owner recovery slots were tested after TPM enrollment.
 symlink label, early firewall ordering, inconsistent ESP mount contexts and
 already-good boot blessing behavior. Source fixes all four; a fresh complete
 image must pass without those writable fixture repairs. The prototype also used
-the revised DHCP input policy before restarting its guest. The signed `/usr`
+the revised DHCP input policy before restarting its guest. Normal host shutdown
+then exposed vmspawn's SIGKILL fallback when SSH injection is disabled. A narrow
+template stop helper now sends native ACPI poweroff and waits for all unit
+processes, keeping storage available; ordinary shutdown waits for owner assistance
+if a guest refuses. Automatic maintenance retains its bounded abort/recovery path.
+Fresh-image acceptance of the helper remains required. The signed `/usr`
 remained read-only and SELinux remained enforcing throughout.
 
 Native sysupdate testing exposed explicit path-anchor and compact-UUID filename
