@@ -185,8 +185,11 @@ and requires commissioning and the 04:30 window.
 For disk replacement, enter persistent maintenance, physically identify the failed
 member and select its role. `replace-disk --role … --disk /dev/disk/by-id/… --serial …`
 first prints a deterministic reviewable erasing plan; the second invocation needs
-its exact confirmation and independent recovery-key file. It replaces the Btrfs
-device, resynchronizes swap and provisions complete OS slots/ESP on the new disk.
+its exact confirmation and independent recovery-key file. It refreshes crypttab
+from the new LUKS identities, waits in the foreground for the Btrfs device copy,
+resynchronizes swap and provisions complete OS slots/ESP on the new disk. Keep the
+owner session or transient service alive until it returns; large devices can take
+hours. Do not impose a short service runtime limit on that copy.
 `finalize-replacement` refuses completion until replacement/resync finish and all
 allocated Btrfs data/metadata/system profiles are RAID1. Interrupted replacement
 requires owner review of its durable journal. Test both independent boot paths

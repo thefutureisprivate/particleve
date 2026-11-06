@@ -2,7 +2,7 @@
 
 Date: 2026-11-06
 
-Status: Implementation in progress; see [validation status](Documentation/Status.md). Hardware commissioning has not started.
+Status: Uncommissioned candidate implementation and disposable acceptance in progress; see [validation status](Documentation/Status.md). The owner selected delivery without physical-host commissioning. Automatic OS timers remain disabled.
 
 Build a reusable, minimal, headless ParticleOS hypervisor that runs on machines meeting the platform requirements below. Use Fedora 45, upstream systemd stable packages from OBS, and systemd-vmspawn with QEMU/KVM. Follow ParticleOS's EROFS/verity and encrypted Btrfs storage model, extending it for an independently bootable two-disk pair. Hardware identity, disk capacity, and device naming are installation inputs rather than properties of the image.
 
@@ -319,54 +319,54 @@ Treat Secure Boot `db`/`dbx` updates as manual firmware/security maintenance too
 
 ## 9. Implementation milestones
 
-Complete milestones in order. All items below are outstanding.
+The implementation and measured evidence are tracked below and in Documentation/Status.md. A checked implementation item does not close a milestone whose full exit criteria remain unvalidated. M6 physical commissioning and automatic enablement are excluded from the selected candidate delivery.
 
 ### M1 — Inventory and compatible build baseline
 
 - [ ] Define supported architectures, CPU baselines, driver coverage, and the capability preflight; measure host RAM and storage minima.
 - [ ] Record each test installation's hardware capabilities, stable disk/NIC identities, firmware support, recovery access, and network configuration.
-- [ ] Pin compatible ParticleOS/mkosi inputs, Fedora 45, the stable systemd package family, and current compatible QEMU/guest firmware packages for each supported architecture.
-- [ ] Establish the headless profile, OBS definitions, dependency recipe, source triggers, signing coverage, and single update feed.
-- [ ] Produce the package manifest and a bootable baseline image with automation timers disabled.
+- [x] Pin compatible ParticleOS/mkosi inputs, Fedora 45, the stable systemd package family, and current compatible QEMU/guest firmware packages for each supported architecture.
+- [x] Establish the headless profile, OBS definitions, dependency recipe, source triggers, signing coverage, and single update feed.
+- [x] Produce the package manifest and a bootable baseline image with automation timers disabled.
 
 Exit: the built image contains the intended package versions and required runtime/firmware components, with no accidental desktop profile or upstream update-feed inheritance.
 
 ### M2 — Dual-disk installation and verified boot
 
-- [ ] Implement configurable layout sizing, per-device LUKS2, native Btrfs data/metadata RAID1, `/var`, separate encrypted mirrored swap, and the installation manifest.
-- [ ] Omit the separate `/home` partition; disable destructive root reset and automatic writable-root rollback paths.
-- [ ] Implement installation and independent ESP setup using explicit disk identities.
-- [ ] Enroll and test Secure Boot, verity verification, TPM unlock, and owner recovery.
+- [x] Implement configurable layout sizing, per-device LUKS2, native Btrfs data/metadata RAID1, `/var`, separate encrypted mirrored swap, and the installation manifest.
+- [x] Omit the separate `/home` partition; disable destructive root reset and automatic writable-root rollback paths.
+- [x] Implement installation and independent ESP setup using explicit disk identities.
+- [x] Enroll and test Secure Boot, verity verification, TPM unlock, and owner recovery.
 - [ ] Validate generic initrd discovery, bounded degraded boot, degraded writes, disk replacement, and restoration of RAID1 profiles and both boot paths.
 
 Exit: either selected boot disk alone boots the intended verified OS and makes encrypted host/guest storage available. The active-`/usr` disk-loss limitation is documented and tested.
 
 ### M3 — Minimal usable virtualization host
 
-- [ ] Configure management networking, bridges/VLANs, nftables, and SSH.
-- [ ] Verify the packaged vmspawn template, machined/machinectl integration, KVM, and architecture-appropriate QEMU/firmware components.
-- [ ] Document the external VM storage/unit interface, including per-VM subvolumes, raw file attributes, and persistent EFI/vTPM state.
+- [x] Configure management networking, bridges/VLANs, nftables, and SSH.
+- [x] Verify the packaged vmspawn template, machined/machinectl integration, KVM, and architecture-appropriate QEMU/firmware components.
+- [x] Document the external VM storage/unit interface, including per-VM subvolumes, raw file attributes, and persistent EFI/vTPM state.
 - [ ] Verify the runtime with a disposable test VM: registration, console, disk/network I/O, and persistent firmware/optional TPM state.
 - [ ] Verify SELinux confinement, microcode/device firmware, zswap, encrypted swap, and host memory headroom.
 - [ ] Verify storage dependencies and graceful poweroff with disposable VMs while preserving externally defined startup policies.
-- [ ] Validate shared Btrfs capacity reporting, bounded host logs/caches, and the documented NOCOW tradeoff.
+- [x] Validate shared Btrfs capacity reporting, bounded host logs/caches, and the documented NOCOW tradeoff.
 
 Exit: host administration, networking, storage, and the virtualization runtime work with the intended package/service footprint.
 
 ### M4 — Coordinated OS update and fallback
 
-- [ ] Implement transaction state, explicit per-disk transfers, ESP handling, locking, and rejected-release tracking.
-- [ ] Add the conditional maintenance timer, pre-reboot VM shutdown check, temporary start/restart inhibition, health assessment, and recovery timeout/watchdog integration.
+- [x] Implement transaction state, explicit per-disk transfers, ESP handling, locking, and rejected-release tracking.
+- [x] Add the conditional maintenance timer, pre-reboot VM shutdown check, temporary start/restart inhibition, health assessment, and recovery timeout/watchdog integration.
 - [ ] Exercise shutdown refusal, late exits, concurrent starts/restarts, interrupted maintenance, and restoration of only VMs stopped by the failed attempt.
 - [ ] Exercise normal update, interruptions, incomplete feed/disk state, failed boot, and retained-OS access to persistent Btrfs and VM auxiliary state.
-- [ ] Verify OBS dependency-only and source-change rebuilds produce distinguishable complete releases.
+- [x] Verify OBS dependency-only and source-change rebuilds produce distinguishable complete releases.
 
 Exit: a complete update boots successfully after confirmed VM exits; failures preserve a usable fallback. No-update, blocked-update, and refused-shutdown cases never cause an automatic reboot, and aborted maintenance restores the affected running set or reports restoration failure.
 
 ### M5 — Working supervised fwupd
 
 - [ ] Verify device discovery, EFI helper trust, ESP selection, metadata refresh, and available-update reporting.
-- [ ] Implement manual maintenance inhibition and preservation of capsule/`BootNext` state.
+- [x] Implement manual maintenance inhibition and preservation of capsule/`BootNext` state.
 - [ ] Complete a real supported firmware update under supervision with Secure Boot enabled when an eligible update is available.
 - [ ] Verify post-update firmware results and TPM unlock; confirm no firmware installation/staging timer exists.
 
@@ -376,8 +376,8 @@ Exit: firmware maintenance works end to end for the tested device/update transpo
 
 - [ ] Complete the acceptance matrix below and record evidence with image/hardware versions and selected installation settings.
 - [ ] Exercise the same architecture image on varied supported hardware: include Intel and AMD for x86-64, supported storage transports, different capacities, and different NIC/firmware implementations. Record gaps without requiring a second production host.
-- [ ] Write operational procedures for installation, disk replacement, boot fallback, TPM recovery, manual firmware maintenance, and update inhibition.
-- [ ] Review the final package/service manifest and expose lightweight status for Btrfs profiles/errors/capacity, swap redundancy, disk health, pending/rejected releases, and maintenance state.
+- [x] Write operational procedures for installation, disk replacement, boot fallback, TPM recovery, manual firmware maintenance, and update inhibition.
+- [x] Review the final package/service manifest and expose lightweight status for Btrfs profiles/errors/capacity, swap redundancy, disk health, pending/rejected releases, and maintenance state.
 - [ ] Enable automatic OS preparation and the guarded 04:30 maintenance timer only after their commissioning criteria pass.
 - [ ] Observe a successful unattended OS update and a subsequent no-update maintenance window.
 

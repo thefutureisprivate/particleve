@@ -168,6 +168,23 @@ def enrollment_uuids(manifest):
     return sorted([d["state_luks_uuid"] for d in manifest["devices"]] + [manifest["swap"]["luks_uuid"]])
 
 
+def crypttab(manifest):
+    return (
+        "".join(
+            f"particleve-state-{d['role']} UUID={d['state_luks_uuid']} - "
+            "tpm2-device=auto,x-initrd.attach,nofail,x-systemd.device-timeout=30s\n"
+            for d in manifest["devices"]
+        )
+        + f"particleve-swap UUID={manifest['swap']['luks_uuid']} - tpm2-device=auto\n"
+    )
+
+
+def replace_btrfs(devid, mapper):
+    # The caller/service must own the copy until it finishes. Backgrounding lets
+    # service teardown cancel the scrub ioctl before the replacement completes.
+    run(["btrfs", "replace", "start", "-B", str(devid), mapper, "/"], timeout=None)
+
+
 def enroll_tpm(backend, keyfile, state):
     """Bind PCR7 from the normal verified boot, never from the recovery installer."""
     validate_keyfile(keyfile)
@@ -331,16 +348,9 @@ def install(config, release_directory, proposed, confirmation, keyfile, *, keyri
                             "defaults,x-systemd.device-timeout=45s 0 0\n"
                         )
                         atomic_write(root / "etc/fstab", fstab.encode(), 0o644)
-                        crypttab = "".join(
-                            f"particleve-state-{d['role']} UUID={d['state_luks_uuid']} - "
-                            "tpm2-device=auto,x-initrd.attach,nofail,x-systemd.device-timeout=30s\n"
-                            for d in proposed["devices"]
+                        atomic_write(
+                            root / "etc/crypttab", crypttab({**proposed, **recorded_storage}).encode()
                         )
-                        crypttab += (
-                            f"particleve-swap UUID={recorded_storage['swap']['luks_uuid']} - "
-                            "tpm2-device=auto\n"
-                        )
-                        atomic_write(root / "etc/crypttab", crypttab.encode())
                         atomic_write(
                             root / "etc/mdadm.conf",
                             (
@@ -467,8 +477,9 @@ def replace(config, backend, role, replacement, *, confirmation=None, keyfile=No
     record["config_sha256"] = digest(new_config)
     write_json(backend.directory / "installation.json", record)
     write_json("/etc/particleve/host.json", new_config)
+    atomic_write(Path("/etc/crypttab"), crypttab(record).encode())
     backend.manifest, backend.config = record, new_config
-    run(["btrfs", "replace", "start", str(old["btrfs_devid"]), f"/dev/mapper/{mapper}", "/"])
+    replace_btrfs(old["btrfs_devid"], f"/dev/mapper/{mapper}")
     run(["mdadm", "--manage", "/dev/md/particleve-swap", "--add", member(device, "swap")])
     backend.expose_boot(role, release)
     with backend.esp(role) as esp:

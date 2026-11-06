@@ -9,6 +9,24 @@ from particleve.common import Error, read_json
 
 
 class TPMEnrollmentTests(unittest.TestCase):
+    def test_replacement_crypttab_tracks_new_luks_identity_and_preserves_peer_swap(self):
+        manifest = self.backend(Path("/unused")).manifest
+        manifest["devices"][0]["state_luks_uuid"] = "replacement-a"
+        text = install.crypttab(manifest)
+        self.assertIn("particleve-state-a UUID=replacement-a - ", text)
+        self.assertIn("particleve-state-b UUID=state-b - ", text)
+        self.assertIn("particleve-swap UUID=swap - tpm2-device=auto\n", text)
+        self.assertNotIn("UUID=state-a ", text)
+
+    def test_replacement_copy_stays_owned_until_completion_without_short_timeout(self):
+        with patch.object(install, "run") as command:
+            install.replace_btrfs(1, "/dev/mapper/particleve-state-a")
+        self.assertEqual(
+            command.call_args.args[0],
+            ["btrfs", "replace", "start", "-B", "1", "/dev/mapper/particleve-state-a", "/"],
+        )
+        self.assertIsNone(command.call_args.kwargs["timeout"])
+
     def test_recovery_installer_formats_without_binding_its_pcr7(self):
         with patch.object(install, "run", return_value=SimpleNamespace(stdout="test-uuid\n")) as commands:
             install.format_encrypted("/dev/disposable", "test", "/run/test-key", enroll=False)
