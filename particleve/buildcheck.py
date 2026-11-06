@@ -110,9 +110,11 @@ def root_check(root, *, tree="usr", output=None):
     ]
     names = {r[0] for r in rows}
     family = [r for r in rows if r[0].startswith("systemd") or r[0] in ("udev", "libudev")]
+    require(family, "RPM metadata unavailable; provenance must be checked before package metadata cleanup")
+    wrong_origin = [row for row in family if "system:systemd:stable" not in row[3]]
     require(
-        family and all("system:systemd:stable" in row[3] for row in family),
-        "systemd family contains packages outside upstream OBS stable",
+        not wrong_origin,
+        "systemd family contains packages outside upstream OBS stable: " + repr(wrong_origin),
     )
     require(len({row[1] for row in family}) == 1, "mixed systemd family versions")
     if tree != "tools":

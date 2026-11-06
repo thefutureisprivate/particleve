@@ -1,11 +1,14 @@
 # Source-change webhooks
 
-The owner chose to register these webhooks. No new service token has been created
-by the implementation. Dependency rebuilds use OBS's transitive repository graph;
+Four package-scoped OBS runservice tokens have been created and their server-side
+bindings verified. The owner registers the corresponding GitHub webhooks. URLs
+and matching secrets are in `/tmp/particleve-obs-webhooks.json` (mode 0600); secrets
+are never committed or included in build sources. Dependency rebuilds use OBS's transitive repository graph;
 source pushes need the following four package-scoped hooks.
 
-For each package below, create a token limited to that package (default operation:
-runservice), using your own authenticated osc session:
+The existing token IDs are 13084 (image), 13087 (integration), 13090 (mkosi),
+and 13093 (fwupd-efi). Do not create duplicate tokens. For future replacement,
+create a token limited to the appropriate package using your authenticated osc session:
 
 ```sh
 osc token --create home:thefutureisprivate:particleve particleve-image
