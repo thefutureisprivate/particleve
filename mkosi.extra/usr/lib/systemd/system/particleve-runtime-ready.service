@@ -1,7 +1,7 @@
 [Unit]
 Description=Verify writable storage and retained runtime state before starting VMs
-After=local-fs.target swap.target systemd-machined.service
-Requires=systemd-machined.service
+After=local-fs.target swap.target systemd-machined.service boot-complete.target systemd-bless-boot.service
+Requires=systemd-machined.service boot-complete.target systemd-bless-boot.service
 Before=machines.target
 RequiresMountsFor=/var /var/lib/machines /home
 

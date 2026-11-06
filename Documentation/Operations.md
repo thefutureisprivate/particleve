@@ -60,9 +60,11 @@ homectl create alice --storage=subvolume --ssh-authorized-keys=@/run/alice.pub
 ```
 
 Store SSH keys in the user record, so lookup works while a home is inactive.
-Upstream PAM activates subvolume homes without a second per-home LUKS password;
-the host's encryption protects their storage. SSH permits public keys, uses
-upstream `userdbctl ssh-authorized-keys`, and retains PAM account/session checks.
+The host's encryption protects subvolume storage. Native homed still requires
+the account's password to activate an inactive home. Non-root SSH therefore
+requires both a public key and password authentication through PAM; enter
+the password chosen by `homectl` when prompted. Root uses public-key authentication.
+SSH uses upstream `userdbctl ssh-authorized-keys` and PAM account/session checks.
 Classic non-root login accounts fail the homed account gate. System service
 accounts remain ordinary non-login accounts. `particleve check-users` audits the
 local passwd database without mistaking NSS-provided homed users for classic

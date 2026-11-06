@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from .common import atomic_write
+from .common import atomic_write, require
 
 
 def render(config):
@@ -80,5 +80,15 @@ def render(config):
 
 
 def write(config, root):
+    root = Path(root)
+    root.mkdir(parents=True, exist_ok=True, mode=0o700)
     for name, content in render(config).items():
-        atomic_write(Path(root) / name, content.encode(), mode=0o644)
+        # These are public daemon configuration directories, including when
+        # the owner recovery environment uses umask 077. JSON state stays private.
+        parent = root
+        for part in Path(name).parts[:-1]:
+            parent /= part
+            require(not parent.is_symlink(), f"configuration directory is a symlink: {parent}")
+            parent.mkdir(exist_ok=True)
+            parent.chmod(0o755)
+        atomic_write(root / name, content.encode(), mode=0o644)

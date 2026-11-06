@@ -154,6 +154,10 @@ def root_check(root, *, tree="usr", output=None):
             "UsePAM yes" in ssh and "userdbctl ssh-authorized-keys %u" in ssh,
             "generic SSH defaults must activate homed and retrieve keys through upstream userdb",
         )
+        require(
+            "AuthenticationMethods publickey,password" in ssh,
+            "cold-home SSH requires a key and native PAM authentication",
+        )
         userdb_rule = root / "usr/lib/tmpfiles.d/20-systemd-userdb.conf"
         require(
             not userdb_rule.exists() and not userdb_rule.is_symlink(),
@@ -175,6 +179,15 @@ def root_check(root, *, tree="usr", output=None):
             require(
                 "SELINUX=enforcing" in (root / path).read_text(),
                 "SELinux factory configuration is not enforcing",
+            )
+        policy = root / "etc/selinux/targeted/policy"
+        factory = root / "usr/share/factory/etc/selinux/targeted/policy"
+        binaries = list(policy.glob("policy.*"))
+        require(binaries, "compiled SELinux policy is missing")
+        for binary in binaries:
+            require(
+                binary.read_bytes() == (factory / binary.name).read_bytes(),
+                "factory SELinux policy differs from the configured image policy",
             )
         for path in (root / "etc/systemd/system").glob("*.wants/systemd-sysupdate*.timer"):
             require(not path.is_symlink(), f"uncommissioned timer enabled: {path}")

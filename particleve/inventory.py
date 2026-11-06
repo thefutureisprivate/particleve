@@ -5,6 +5,7 @@ import json
 import os
 import platform
 import shutil
+import tempfile
 from pathlib import Path
 
 from .common import Error, require, run
@@ -28,6 +29,10 @@ INSTALL_TOOLS = (
     "bootctl",
     "systemd-sysusers",
     "systemd-tmpfiles",
+    "systemd-firstboot",
+    "systemctl",
+    "systemd-analyze",
+    "tpm2_pcrread",
     "tpm2_testparms",
     "restorecon",
     "setfiles",
@@ -102,6 +107,35 @@ def kvm_available():
         return False
 
 
+def measured_boot(*, normal=False):
+    run(["systemd-analyze", "has-tpm2"])
+    logs = list(Path("/sys/kernel/security").glob("tpm*/binary_bios_measurements"))
+    require(len(logs) == 1, "one firmware TPM event log is required")
+    with logs[0].open("rb") as stream:
+        require(stream.read(1), "firmware TPM event log is empty")
+    registers = (7, 11) if normal else (7,)
+    with tempfile.TemporaryDirectory(prefix="particleve-pcr-", dir="/run") as temporary:
+        output = Path(temporary) / "pcrs.bin"
+        run(
+            [
+                "tpm2_pcrread",
+                "--pcrs_format=values",
+                f"--output={output}",
+                "sha256:" + ",".join(str(index) for index in registers),
+            ]
+        )
+        data = output.read_bytes()
+        require(len(data) == 32 * len(registers), "unexpected SHA256 PCR data")
+        for offset, register in enumerate(registers):
+            require(
+                any(data[offset * 32 : (offset + 1) * 32]),
+                f"firmware SHA256 PCR{register} has no measurements",
+            )
+    if normal:
+        run(["systemd-analyze", "condition", "ConditionSecurity=measured-uki"])
+    return True
+
+
 def installer_utilities():
     missing = [name for name in INSTALL_TOOLS if not shutil.which(name)]
     require(not missing, "missing installer utilities: " + ", ".join(missing))
@@ -135,6 +169,7 @@ def collect(config):
         ),
     )
     check("TPM RSA4096 PCR policy", lambda: run(["tpm2_testparms", "rsa4096"]).returncode == 0)
+    check("firmware TPM measurements", measured_boot)
     ram_kib = int(
         next(
             line.split()[1]

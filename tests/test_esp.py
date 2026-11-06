@@ -4,6 +4,7 @@ import contextlib
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from particleve.common import Error, hash_file
 from particleve.linux import Linux
@@ -37,6 +38,7 @@ class ESPTests(unittest.TestCase):
         self.backend.matching_partition = lambda role, manifest, kind: (
             cache / manifest["artifacts"][kind]["file"]
         )
+        self.active = self.enterContext(patch("particleve.linux.require_active_services"))
 
     def test_existing_boot_counter_and_capsules_survive_preparation(self):
         for role, esp in self.esps.items():
@@ -64,6 +66,48 @@ class ESPTests(unittest.TestCase):
         with self.assertRaises(Error):
             self.backend.prove_fallback("2")
         self.assertTrue((esp / "EFI/Linux/ParticleVE_2_x86-64+0-3.efi").exists())
+
+    def test_blessing_uses_only_booted_esp_and_rejects_modified_uki(self):
+        for role in self.esps:
+            self.backend.expose_boot(role, self.manifest)
+        self.backend.current_version = lambda: "2"
+        self.backend.current_esp_role = lambda: "a"
+        with patch("particleve.linux.run") as command:
+            self.backend.bless_current()
+            command.assert_called_once_with(
+                ["/usr/lib/systemd/systemd-bless-boot", f"--path={self.esps['a']}", "good"]
+            )
+        self.assertTrue((self.esps["b"] / "EFI/Linux/ParticleVE_2_x86-64+3.efi").exists())
+        (self.esps["a"] / "EFI/Linux/ParticleVE_2_x86-64+3.efi").write_bytes(b"modified")
+        with patch("particleve.linux.run") as command, self.assertRaisesRegex(Error, "authenticated"):
+            self.backend.bless_current()
+        command.assert_not_called()
+
+    def test_unblessed_boot_cannot_be_used_as_fallback(self):
+        self.active.side_effect = Error("systemd-bless-boot.service is not active")
+        with self.assertRaisesRegex(Error, "systemd-bless-boot"):
+            self.backend.prove_fallback("2")
+
+    def test_firmware_esp_identity_must_belong_to_selected_pair(self):
+        selected = "d75dc3d4-767e-4de2-a013-20fa67cea6f1"
+        self.backend.manifest = {
+            "devices": [
+                {"role": "a", "partitions": [{"role": "esp", "uuid": selected}]},
+                {"role": "b", "partitions": []},
+            ]
+        }
+        with patch.object(
+            Path, "read_bytes", return_value=b"\x07\0\0\0" + (selected.upper() + "\0").encode("utf-16-le")
+        ):
+            self.assertEqual(self.backend.current_esp_role(), "a")
+        foreign = "2fac3387-1ab2-468b-a2f9-02a243d38afb"
+        with (
+            patch.object(
+                Path, "read_bytes", return_value=b"\x07\0\0\0" + (foreign + "\0").encode("utf-16-le")
+            ),
+            self.assertRaisesRegex(Error, "outside the selected disk pair"),
+        ):
+            self.backend.current_esp_role()
 
 
 if __name__ == "__main__":

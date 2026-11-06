@@ -3,6 +3,7 @@
 import json
 import re
 import tempfile
+import uuid
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -15,6 +16,7 @@ from .common import (
     hash_file,
     read_json,
     require,
+    require_active_services,
     run,
     sync_dir,
     write_json,
@@ -104,6 +106,30 @@ class Linux:
     def disk(self, role):
         return next(d for d in self.manifest["devices"] if d["role"] == role)
 
+    def current_esp_role(self):
+        variable = Path("/sys/firmware/efi/efivars/LoaderDevicePartUUID-4a67b082-0a4c-41cf-b6c7-440b29bb8c4f")
+        selected = str(uuid.UUID(variable.read_bytes()[4:].decode("utf-16-le").rstrip("\0")))
+        matches = [
+            d["role"]
+            for d in self.manifest["devices"]
+            if any(p["role"] == "esp" and p["uuid"] == selected for p in d["partitions"])
+        ]
+        require(len(matches) == 1, "booted ESP is outside the selected disk pair")
+        return matches[0]
+
+    def bless_current(self):
+        current = self.current_version()
+        role = self.current_esp_role()
+        release = self.local_release(current)
+        with self.esp(role) as esp:
+            entries = self.boot_entries(esp, current)
+            require(
+                len(entries) == 1 and hash_file(entries[0][0]) == release["artifacts"]["uki"]["sha256"],
+                "booted ESP does not hold the authenticated running UKI",
+            )
+            run(["/usr/lib/systemd/systemd-bless-boot", f"--path={esp}", "good"])
+        return {"boot_blessed": current, "esp_role": role}
+
     @contextmanager
     def esp(self, role):
         device = self.disk(role)
@@ -111,7 +137,17 @@ class Linux:
         source = Path("/dev/disk/by-partuuid") / esp["uuid"]
         require(source.exists(), f"ESP {role} is missing")
         with tempfile.TemporaryDirectory(prefix=f"particleve-esp-{role}-", dir="/run") as temporary:
-            run(["mount", "-t", "vfat", "-o", "rw,nosuid,nodev,noexec,noatime", source, temporary])
+            run(
+                [
+                    "mount",
+                    "-t",
+                    "vfat",
+                    "-o",
+                    "rw,nosuid,nodev,noexec,noatime,umask=0077,context=system_u:object_r:boot_t:s0",
+                    source,
+                    temporary,
+                ]
+            )
             try:
                 yield Path(temporary)
             finally:
@@ -263,6 +299,7 @@ class Linux:
                 sync_dir(esp / "EFI/Linux")
 
     def prove_fallback(self, current):
+        require_active_services("boot-complete.target", "systemd-bless-boot.service")
         release = self.local_release(current)
         for role in ("a", "b"):
             for kind in ("usr", "verity", "verity_sig"):
@@ -290,23 +327,12 @@ class Linux:
     def conditional_reboot(self, version):
         # Use the booted ESP's disk for upstream's installed-version comparison.
         # The two-disk guard has already checked every resource on both paths.
-        current_esp = run(["bootctl", "--print-esp-path"]).stdout.strip()
-        uuid = run(["findmnt", "--noheadings", "--output=UUID", "--target", current_esp]).stdout.strip()
-        candidates = []
-        for role in ("a", "b"):
-            disk = self.disk(role)
-            esp = next(p for p in disk["partitions"] if p["role"] == "esp")
-            observed = run(
-                ["blkid", "-s", "UUID", "-o", "value", f"/dev/disk/by-partuuid/{esp['uuid']}"]
-            ).stdout.strip()
-            if observed == uuid:
-                candidates.append(disk)
-        require(len(candidates) == 1, "cannot identify the currently booted ESP")
+        disk = self.disk(self.current_esp_role())
         release = self.local_release(version)
         with tempfile.TemporaryDirectory(prefix="particleve-reboot-", dir="/run") as temporary:
             for name, content in transfers(
                 release,
-                disk=candidates[0]["path"],
+                disk=disk["path"],
                 source=self.cache / version,
                 current=self.current_version(),
             ).items():
@@ -339,15 +365,16 @@ class Linux:
         check()
         require(inventory.kvm_available(), "KVM is unavailable")
         require(inventory.secure_boot(), "Secure Boot is not enabled")
+        inventory.measured_boot(normal=True)
+        self.current_esp_role()
         require(Path("/sys/fs/selinux/enforce").read_text().strip() == "1", "SELinux is not enforcing")
-        run(
-            [
-                "systemctl",
-                "is-active",
-                "systemd-networkd.service",
-                "systemd-resolved.service",
-                "particleve-firewall.service",
-            ]
+        require_active_services(
+            "systemd-networkd.service",
+            "systemd-resolved.service",
+            "particleve-firewall.service",
+            "sshd.socket",
+            "systemd-homed.service",
+            "auditd.service",
         )
         network = json.loads(
             run(["ip", "--json", "address", "show", "dev", self.config["network"]["management"]]).stdout

@@ -1,0 +1,6 @@
+; Trusted host units deploy signed EFI artifacts and bless the booted entry.
+; Only selected ESPs are mounted boot_t; no permissions on arbitrary dosfs_t.
+(allow init_t boot_t (file (create setattr write append unlink rename)))
+; systemd 262 queries the namespace resource service while assigning home UIDs.
+; Fedora's common socket permissions already allow open/write/getattr, but not read.
+(allow systemd_homed_t systemd_nsresourced_runtime_t (sock_file (read)))

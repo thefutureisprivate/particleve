@@ -9,10 +9,10 @@ have evidence.
 | Area | Current evidence | Still required |
 | --- | --- | --- |
 | Source/configuration | Full upstream Git history published; Fedora 45 native profile; runtime/initrd/tools stable-systemd inputs; resolved summary checks pass; all four source-change webhooks exercised | Complete image validation |
-| OBS | Old project deleted before uploads; new project and persistent signing key; all RPM builds passed; 26.1 and 26.2 accepted from the public feed with all six artifacts, GPG index, EFI signatures and UKI checks; rebuilding only the integration RPM produced 26.2 with unchanged Git sources and persistent-state versions | Boot acceptance |
-| Host integration | 26.1 installed completely on disposable 80 GiB disks, both ESPs/firmware entries, Btrfs RAID1 and synchronized md/LUKS swap; a marked unselected disk remained byte-for-byte unchanged; signed normal boot activated verity and unlocked both state members | Exact-UUID swap assembly fix needs normal-boot validation, followed by cold-home SSH, TPM, degraded boots and replacement |
+| OBS | Old project deleted before uploads; new project and persistent signing key; all RPM builds passed; 27.1 accepted from the public feed with all six artifacts, GPG index, EFI signatures and UKI checks; rebuilding only the integration RPM produced 26.2 from 26.1 with unchanged Git sources and persistent-state versions | Boot acceptance of the revised runtime configuration |
+| Host integration | Disposable 80 GiB pair installed with independent ESPs, Btrfs RAID1 and synchronized md/LUKS swap; marked unselected disk unchanged; 27.1 reached normal runtime with verified `/usr`, encrypted swap, enforcing SELinux and root SSH after prototype configuration repairs | Fresh signed image must reproduce those repairs, cold-home SSH and successful native blessing; then TPM enrollment, degraded boots and replacement |
 | Update maintenance | Durable lock/version/state, two-disk hash verification, boot counters/quarantine, Berlin window, bounded ACPI shutdown and abort restoration | Real sysupdate/ESP interruptions, boot failure/watchdog/fallback, external startup policy and retained-state compatibility |
-| Local checks | Ruff and shell syntax; 52 tests including actual disposable GPG signatures, dirty-file signature-slot overwrite, final driver retention, interrupted transactions and VM failure recovery; pinned mkosi's actual matcher reproduces and verifies the selector fix | Unit tests do not replace normal-boot and hardware acceptance |
+| Local checks | Ruff and shell syntax; 60 tests including disposable GPG signatures, dirty-file signature-slot overwrite, final driver retention, inactive required-service detection, private/public configuration modes, authenticated ESP blessing, interrupted transactions and VM failure recovery | Unit tests do not replace normal-boot and hardware acceptance |
 | Firmware | Signed helper package and metadata-only refresh integration; persistent manual-maintenance exclusion | Device discovery/ESP selection and supervised real update, or evidence no eligible update exists |
 | Commissioning | Evidence-bound command; all automatic OS timers disabled by default | Full acceptance matrix, Intel/AMD and controller/NIC variation, measured memory/capacity minima, unattended update and no-update window |
 
@@ -29,8 +29,25 @@ verity and unlocked both encrypted state members. The initrd then failed because
 mdadm rejects a name-only array definition. Recovery reproduced that rejection;
 assembly with the recorded UUID and explicit swap partition identities passed,
 including single-member startup and restoration to synchronized two-member RAID1.
-The corrected initrd uses that exact-identity path. Successful switch-root and
-unattended TPM unlock remain unvalidated.
+The corrected initrd uses that exact-identity path; 27.1 successfully switched
+root and activated encrypted mirrored swap. Unattended TPM unlock remains
+unvalidated.
+
+With fresh disposable 4 MiB OVMF firmware, Secure Boot, firmware event logging,
+nonzero PCR 7/11 and systemd's measured-UKI condition passed. The older 2 MiB test
+firmware exposed a TPM but left those PCRs zero and provided no event log; the
+preflight now rejects that configuration. No measurement checks were bypassed.
+
+The writable-root prototype verified a fresh inactive homed subvolume account:
+the SSH key alone was rejected, key-plus-password authentication through native
+PAM activated its home, a remote command wrote there, and cleanup removed the
+account. Upstream 262 requires an activation credential even for subvolume homes.
+Keyboard-interactive authentication lost the home reference between OpenSSH
+processes; native password authentication retained it. Root remains key-only.
+These tests used writable prototype SSH/network configuration on 27.1; they do
+not establish unattended first boot of the revised image. Native boot blessing
+also exposed missing SELinux file permissions on selected ESPs; the narrow image
+policy and explicit ESP selection still need a signed-image boot test.
 
 The separate initrd watchdog now uses systemd's initrd presets and survives
 emergency isolation. A real isolation test with the exact revised units, a

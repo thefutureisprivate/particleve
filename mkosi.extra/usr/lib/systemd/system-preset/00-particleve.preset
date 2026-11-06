@@ -5,6 +5,7 @@ disable NetworkManager*
 disable nftables.service
 disable firewalld.service
 disable dnf*.timer
+disable fstrim.timer
 disable packagekit*
 disable cockpit*
 disable libvirtd*

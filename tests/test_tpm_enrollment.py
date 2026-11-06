@@ -42,6 +42,7 @@ class TPMEnrollmentTests(unittest.TestCase):
             with (
                 patch.object(install, "validate_keyfile"),
                 patch.object(install.inventory, "secure_boot", return_value=True),
+                patch.object(install.inventory, "measured_boot", return_value=True),
                 patch.object(install, "member", side_effect=lambda d, role: "/dev/test-" + d["role"]),
                 patch.object(install, "run", return_value=SimpleNamespace(stdout="")) as commands,
             ):
@@ -54,6 +55,15 @@ class TPMEnrollmentTests(unittest.TestCase):
             record = read_json(directory / "tpm-enrollment.json")
             self.assertEqual(record["boot_id"], "normal-boot")
             self.assertEqual(record["luks_uuids"], ["state-a", "state-b", "swap"])
+
+    def test_unmeasured_boot_cannot_enroll_a_volume(self):
+        with (
+            patch.object(install.inventory, "measured_boot", side_effect=Error("unmeasured boot")),
+            patch.object(install, "run") as commands,
+            self.assertRaisesRegex(Error, "unmeasured boot"),
+        ):
+            install.enroll_source("/dev/disposable", "/run/test-key")
+        commands.assert_not_called()
 
     def test_interruption_never_records_completion_and_can_be_retried(self):
         with tempfile.TemporaryDirectory() as temporary:

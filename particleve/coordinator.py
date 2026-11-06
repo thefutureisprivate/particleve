@@ -221,6 +221,7 @@ class Coordinator:
         with lock(self.directory):
             state = self.load()
             self.reconcile(state)
+            self.backend.check_runtime_state()
             self.backend.health()
             current = self.backend.current_version()
             require(current not in state["rejected"], "running a quarantined release")

@@ -124,6 +124,7 @@ def validate_keyfile(path):
 
 
 def enroll_source(source, keyfile):
+    inventory.measured_boot(normal=True)
     run(
         [
             "systemd-cryptenroll",
@@ -307,6 +308,18 @@ def install(config, release_directory, proposed, confirmation, keyfile, *, keyri
                         try:
                             run(["systemd-sysusers", f"--root={root}"])
                             run(["systemd-tmpfiles", f"--root={root}", "--create"], timeout=300)
+                            run(
+                                [
+                                    "systemd-firstboot",
+                                    f"--root={root}",
+                                    "--setup-machine-id",
+                                    "--root-password-hashed=!",
+                                    "--root-shell=/bin/bash",
+                                    "--force",
+                                ]
+                            )
+                            run(["systemctl", f"--root={root}", "preset-all"])
+                            run(["systemctl", f"--root={root}", "set-default", "multi-user.target"])
                         finally:
                             run(["umount", root / "usr"])
                         network.write(config, root)
@@ -331,7 +344,7 @@ def install(config, release_directory, proposed, confirmation, keyfile, *, keyri
                         atomic_write(
                             root / "etc/mdadm.conf",
                             (
-                                "ARRAY /dev/md/particleve-swap UUID="
+                                "HOMEHOST <ignore>\nAUTO -all\nARRAY /dev/md/particleve-swap UUID="
                                 + recorded_storage["swap"]["md_uuid"]
                                 + "\n"
                             ).encode(),

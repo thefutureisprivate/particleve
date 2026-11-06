@@ -23,6 +23,13 @@ def require(condition, message):
         raise Error(message)
 
 
+def require_active_services(*units):
+    # is-active with several names succeeds when any one is active.
+    for unit in units:
+        result = run(["systemctl", "is-active", "--quiet", unit], check=False)
+        require(result.returncode == 0, f"required service is not active: {unit}")
+
+
 def _unique(pairs):
     obj = {}
     for key, value in pairs:

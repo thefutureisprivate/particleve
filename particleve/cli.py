@@ -44,6 +44,7 @@ def parser():
     for name in (
         "activate",
         "assess",
+        "bless-current",
         "runtime-guard",
         "vm-start-guard",
         "recover-vms",
@@ -110,6 +111,15 @@ def execute(args):
             result = coordinator.reboot()
         elif args.command == "assess":
             result = coordinator.assess()
+        elif args.command == "bless-current":
+            with lock(args.state_dir):
+                state = coordinator.load()
+                current = backend.current_version()
+                require(
+                    current in state["accepted"] and current not in state["rejected"],
+                    "boot assessment must accept the running OS before blessing",
+                )
+                result = backend.bless_current()
         elif args.command == "runtime-guard":
             backend.check_storage(healthy=False)
             coordinator.runtime_guard()
