@@ -127,6 +127,8 @@ def root_check(root, *, tree="usr", output=None):
             "usr/bin/homectl",
             "usr/bin/userdbctl",
             "usr/bin/systemd-vmspawn",
+            "usr/lib/systemd/systemd-nsresourced",
+            "usr/lib/systemd/system/systemd-nsresourced.socket",
             "usr/bin/swtpm_setup",
             "usr/bin/smartctl",
             "usr/bin/swtpm_localca",
@@ -135,6 +137,8 @@ def root_check(root, *, tree="usr", output=None):
             "usr/share/zoneinfo/Europe/Berlin",
             "usr/libexec/particleve-homed-account",
             "usr/libexec/particleve-vm-stop",
+            "usr/libexec/particleve-vm-start-guard",
+            "usr/lib/particleve/particleve_vmspawn.pp",
         ):
             require((root / path).exists(), f"missing runtime artifact: {path}")
         require(
@@ -228,10 +232,13 @@ def root_check(root, *, tree="usr", output=None):
         "tree": tree,
         "systemd": family,
         "persistent_state": {
-            n: v
-            for n, v, _, _ in rows
-            if n in ("systemd", "systemd-container", "btrfs-progs", "libtpms", "kernel-core")
-            or n.startswith(("qemu-", "edk2-", "swtpm"))
+            "particleve-vm-label-contract": "confined-mcs-pair-v1",
+            **{
+                n: v
+                for n, v, _, _ in rows
+                if n in ("systemd", "systemd-container", "btrfs-progs", "libtpms", "kernel-core")
+                or n.startswith(("qemu-", "edk2-", "swtpm"))
+            },
         },
         "packages": [
             {"name": n, "evr": v, "vendor": vendor, "origin": origin} for n, v, vendor, origin in rows

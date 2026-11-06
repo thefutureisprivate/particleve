@@ -57,7 +57,6 @@ def parser():
         "assess",
         "bless-current",
         "runtime-guard",
-        "vm-start-guard",
         "recover-vms",
         "finalize-replacement",
         "check-users",
@@ -159,12 +158,6 @@ def execute(args):
                 )
                 (backend.directory / "commissioned.json").unlink(missing_ok=True)
             result = {"automation_enabled": False}
-        elif args.command == "vm-start-guard":
-            from .vms import GATE
-
-            require(not GATE.exists(), "VM starts are temporarily inhibited for OS maintenance")
-            require(inventory.kvm_available(), "KVM acceleration is required")
-            result = {"VM_start": "permitted"}
         elif args.command == "recover-vms":
             with lock(args.state_dir):
                 result = backend.recover_vms()

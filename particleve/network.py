@@ -77,6 +77,7 @@ def firewall(config):
         "    ct state established,related accept",
         "    meta l4proto { icmp, ipv6-icmp } accept",
         '    iifname "vt-*" meta nfproto ipv4 udp sport 68 udp dport 67 accept',
+        '    iifname "ns-*" meta nfproto ipv4 udp sport 68 udp dport 67 accept',
     ]
     for source in network["allowed_sources"]:
         family = "ip6" if ":" in source else "ip"

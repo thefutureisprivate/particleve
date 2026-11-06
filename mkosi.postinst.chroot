@@ -84,6 +84,7 @@ ln -sf /dev/null /usr/lib/systemd/system/fstrim.timer
 printf '/etc/(selinux|audit) -l system_u:object_r:etc_t:s0\n' >>/etc/selinux/targeted/contexts/files/file_contexts.local
 # Build the narrow EFI-write policy into the image, never the worker's kernel.
 semodule --noreload --install /usr/lib/particleve/particleve_boot.cil
+semodule --noreload --install /usr/lib/particleve/particleve_vmspawn.pp
 # Compile audit defaults before making the factory configuration read-only.
 augenrules
 # Capture the newly compiled policy and audit configuration in mkosi.finalize;

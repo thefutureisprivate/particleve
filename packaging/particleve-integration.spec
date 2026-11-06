@@ -8,6 +8,8 @@ BuildArch:      noarch
 BuildRequires:  python3 >= 3.14
 BuildRequires:  gnupg2
 BuildRequires:  coreutils
+BuildRequires:  selinux-policy-devel
+BuildRequires:  make
 Requires:       python3 >= 3.14
 Requires:       systemd-udev
 Requires:       systemd-container
@@ -52,6 +54,9 @@ firmware-maintenance inhibition for the ParticleVE ParticleOS profile.
 %prep
 %autosetup
 
+%build
+make -C packaging/selinux -f /usr/share/selinux/devel/Makefile particleve_vmspawn.pp
+
 %check
 python3 -W error -m unittest discover -v
 
@@ -63,6 +68,8 @@ install -m0644 mkosi.extra/usr/lib/particleve/trust/* %{buildroot}%{_prefix}/lib
 install -D -m0755 bin/particleve %{buildroot}%{_bindir}/particleve
 install -D -m0755 bin/particleve-homed-account %{buildroot}%{_libexecdir}/particleve-homed-account
 install -D -m0755 bin/particleve-vm-stop %{buildroot}%{_libexecdir}/particleve-vm-stop
+install -D -m0755 bin/particleve-vm-start-guard %{buildroot}%{_libexecdir}/particleve-vm-start-guard
+install -m0644 packaging/selinux/particleve_vmspawn.pp %{buildroot}%{_prefix}/lib/particleve/
 install -d %{buildroot}%{_prefix}/lib/particleve-build/particleve
 install -m0644 particleve/__init__.py particleve/common.py particleve/config.py particleve/release.py \
     particleve/kernels.py particleve/buildartifacts.py %{buildroot}%{_prefix}/lib/particleve-build/particleve/
@@ -73,6 +80,8 @@ install -D -m0755 tools/obs-postoutput %{buildroot}%{_libexecdir}/particleve-obs
 %{_bindir}/particleve
 %{_libexecdir}/particleve-homed-account
 %{_libexecdir}/particleve-vm-stop
+%{_libexecdir}/particleve-vm-start-guard
+%{_prefix}/lib/particleve/particleve_vmspawn.pp
 %{_prefix}/lib/particleve/particleve
 %{_prefix}/lib/particleve/trust
 

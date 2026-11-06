@@ -2,7 +2,6 @@
 
 import contextlib
 import fcntl
-import hashlib
 import json
 import os
 import subprocess
@@ -50,6 +49,8 @@ def canonical(value):
 
 
 def digest(value):
+    import hashlib
+
     return hashlib.sha256(canonical(value)).hexdigest()
 
 
@@ -114,6 +115,8 @@ def run(args, *, input=None, timeout=120, check=True):
 
 
 def hash_file(path, size=None):
+    import hashlib
+
     result = hashlib.sha256()
     remaining = size
     with Path(path).open("rb", buffering=0) as stream:

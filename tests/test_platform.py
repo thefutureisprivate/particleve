@@ -85,6 +85,8 @@ class PlatformTests(unittest.TestCase):
         self.assertIn("ip6 saddr 2001:db8:1::/64", firewall)
         self.assertNotIn("flush ruleset", firewall)
         self.assertNotIn("forward", firewall)
+        for prefix in ("vt-*", "ns-*"):
+            self.assertIn(f'iifname "{prefix}" meta nfproto ipv4 udp sport 68 udp dport 67 accept', firewall)
         candidate["network"]["vlans"] = [{"name": "v10", "id": 10, "parent": "br0", "bridge": "br0"}]
         with self.assertRaises(Error):
             config.validate(candidate)

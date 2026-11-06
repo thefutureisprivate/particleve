@@ -9,7 +9,7 @@ and the real signed feed. Inspect a read-only preflight before preparing a plan.
 policy preview. At boot, `apply-firewall` renders the running image's policy from
 the bound host settings and sends it directly to nftables. Generic firewall fixes
 therefore follow the OS without replacing persistent installation settings.
-The host-input policy allows DHCP requests only on native vmspawn `vt-*` TAPs;
+The host-input policy allows DHCP requests on native `vt-*` and broker `ns-*` TAPs;
 management SSH remains restricted to the configured management sources.
 Install the ParticleVE integration RPM from the owner-trusted OBS repository;
 it includes the public release-verification material. Authenticate its repository
@@ -94,11 +94,43 @@ compression; scrub cannot detect or repair corruption in those contents. Normal
 host and EFI/vTPM files keep CoW/checksums. Use the exact packaged vmspawn/QEMU
 options supported by the release and record persistent-state paths in acceptance
 evidence. Guest workload provisioning and backups are outside ParticleVE.
+
+Each newly provisioned VM needs a permanent, unique pair of SELinux MCS categories.
+External provisioning labels its root subvolume `virt_var_lib_t`, mode 0700 and
+owned by root; its raw disks, seed media and precreated EFI variable file use
+`svirt_image_t`. Its TPM directory uses `virt_var_lib_t`. All these labels carry
+the same pair, for example `s0:c10,c20`. Do not recursively relabel a running or
+retained VM. Changes to an existing VM's labels or auxiliary state need an
+explicit retained-data review; ParticleVE supplies no migration.
+
+The external instance drop-in must set the matching process context:
+
+```ini
+[Service]
+SELinuxContext=system_u:system_r:particleve_vmspawn_t:s0:c10,c20
+```
+
+The mandatory internal launch guard rejects missing/mismatched categories,
+duplicate category pairs, nonprivate directories, disabled enforcement and absent
+KVM before launching QEMU. It labels only PID1's temporary per-VM runtime
+directory. The packaged policy transitions QEMU into `svirt_t` and swtpm into
+`swtpm_t`, with MCS constraints on both. The trusted vmspawn controller has its
+own confined domain. Maintenance verifies actual process labels and category
+agreement; an unconfined or unexpected process blocks activation.
+
+Keep the template's private `/tmp` and `/var/tmp` bindings, launch/stop helpers,
+namespace-broker dependency and capability restriction when supplying external
+VM arguments. Native nsresourced allocates the TAP descriptor; `CAP_NET_ADMIN`
+is removed from the whole VM unit. The policy is compiled during the integration
+RPM build and incorporated into the image's factory policy; policy development
+tools are not runtime inputs.
+
 The host's template drop-in sends native ACPI poweroff and waits for every VM
 process before completing a normal unit stop or host shutdown. It uses an
 unbounded stop timeout so a refusing guest needs owner assistance instead of
 falling through to vmspawn's signal handler, which kills QEMU when SSH injection
 is disabled. Keep this synchronous `ExecStop` when overriding VM arguments.
+Inspection errors retain the wait instead of falling through to signals.
 Automatic maintenance retains its separate bounded refusal/recovery transaction
 while the host is still running; it never enters host shutdown with live VMs.
 The selected native interface supports `--efi-nvram-state=PATH` for a persistent

@@ -7,6 +7,7 @@ import time
 from pathlib import Path
 
 from .common import Deferred, Error, atomic_write, read_json, require, run, sync_dir, write_json
+from .confinement import verify_processes
 
 UNIT = re.compile(r"systemd-vmspawn@[A-Za-z0-9_.:\\-]+\.service\Z")
 GATE = Path("/run/particleve/vm-start-inhibited")
@@ -178,6 +179,7 @@ class LinuxVMs:
                     "temporary VM inhibition was overridden",
                 )
             processes = cgroup_processes(state["ControlGroup"])
+            verify_processes(processes)
             require(
                 int(info["Leader"]) in {p["pid"] for p in processes}, "QEMU leader is not in its owning unit"
             )

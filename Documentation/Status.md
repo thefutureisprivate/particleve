@@ -7,13 +7,13 @@ PLAN.md milestones remain open until their complete exit criteria have evidence.
 
 | Area | Evidence | Remaining acceptance |
 | --- | --- | --- |
-| Sources and OBS | Four scoped GitHub source hooks exercised; persistent OBS signing; RPMs built; signed public image 30.1 verified; dependency-only integration rebuild produced distinguishable 26.2 with unchanged Git and persistent-state contracts | Complete fresh-image acceptance of the latest source |
+| Sources and OBS | Four scoped GitHub source hooks exercised; persistent OBS signing; signed public image 34.1 authenticated and installed on fresh disposable disks; dependency-only integration rebuild produced distinguishable 26.2 with unchanged Git and persistent-state contracts | Complete fresh-image acceptance of the latest source |
 | Native boot | Prototype 28.1 booted unattended from either selected ESP with Secure Boot, measured PCR7/11, verity, TPM unlock, SELinux enforcing, homed SSH, RAID1 data/metadata and encrypted mirrored swap | Fresh installation incorporating all repairs; sole-member boots, degraded writes and replacement |
-| Virtualization | Packaged vmspawn template, nested KVM, machined registration, TAP/DHCP, readiness, disk/network I/O and persistent guest EFI state; only raw disk has NOCOW | Guest vTPM and broader runtime/confinement acceptance |
+| Virtualization | Packaged vmspawn template, nested KVM, machined registration, TAP/DHCP, readiness, disk/network I/O; dedicated confined controller/QEMU/swtpm prototype preserves disk, EFI and TPM NV markers across native restart | Signed-image confinement acceptance |
 | Native update | Both authenticated 30.1 sets prepared while host/guest ran; supervised activation gracefully stopped the guest, booted 30.1 unattended, passed assessment/blessing and cleared pending state | Interruption boundaries, refusing/late guests, actual watchdog/fallback and retained-state compatibility |
 | VM recovery | Real concurrent template start refused; real graceful ACPI poweroff, refusal and late-exit reconciliation passed; guest disk/EFI markers and pinned SSH identity survived restart and host update; disabled permanent startup policy was preserved | Multiple-guest and fresh-image shutdown-ordering acceptance |
 | Resources | Btrfs profiles/errors/capacity, swap redundancy, physical RAM availability and selected-disk SMART reporting; memory reserve and SMART-fault maintenance guards; real virtual-disk SMART unavailability reported explicitly | Measured minimum physical RAM, real disk/controller health and pressure acceptance |
-| Checks | Ruff, formatting, shell syntax and 77 tests pass, including disposable GPG verification, native transfer UUIDs, boot blessing, transaction recovery, resource guards and VM shutdown logic | Tests do not establish hardware commissioning |
+| Checks | Ruff, formatting, shell syntax and 83 tests pass, including disposable GPG verification, native transfer UUIDs, boot blessing, transaction recovery, resource guards, VM shutdown and MCS launch contracts | Tests do not establish hardware commissioning |
 | Firmware | Signed EFI helper; native device/update discovery; metadata-only refresh; persistent manual-maintenance exclusion | Real supported update/transport, or recorded lack of eligible update; either-disk ESP selection |
 
 ## Scope of the disposable evidence
@@ -63,10 +63,20 @@ native PAM, activated its home and wrote there; key-only authentication was
 rejected. Root remains key-only and keeps its home on encrypted writable state.
 Non-root login users must come from homed. System service accounts remain native.
 
-Packaged vmspawn/QEMU processes run in `unconfined_service_t`; global enforcing
-mode alone does not establish VM process confinement. Commissioning must review
-that upstream policy coverage. Guest vTPM tools are now explicit image inputs;
-persistent guest vTPM acceptance is still open.
+The original packaged vmspawn/QEMU processes ran in `unconfined_service_t`;
+global enforcing mode did not establish VM process confinement. A dedicated
+confined controller now transitions QEMU and swtpm into their native domains
+with matching per-VM MCS categories. In the disposable recovery prototype, the
+repository launch guard passed, native readiness/registration/SSH worked, and
+disk, EFI and TPM NV markers survived graceful restart. Negative tests confirmed
+resource-level denial of cross-category VM data, host-private data and an
+unconfined host-service socket. No permission connecting guests to unconfined
+services was added. Native nsresourced TAP allocation, networkd DHCP and
+process inventory passed with CAP_NET_ADMIN absent from every VM process. The
+confined synchronous stop helper also passed normal unit shutdown with guest
+exit status zero and no forced termination. Signed-image acceptance remains required.
+The new label contract changes the persistent-state compatibility marker;
+existing unconfined VM state is not automatically migrated or relabeled.
 
 The exact initrd watchdog units survived emergency isolation in a real shortened
 disposable test. Actual normal-boot cancellation, full timeout/counter exhaustion
