@@ -88,6 +88,19 @@ class ESPTests(unittest.TestCase):
         with self.assertRaisesRegex(Error, "systemd-bless-boot"):
             self.backend.prove_fallback("2")
 
+    def test_healthy_boot_of_an_already_blessed_uki_does_not_require_a_counter(self):
+        self.backend.expose_boot("a", self.manifest)
+        esp = self.esps["a"]
+        counted = esp / "EFI/Linux/ParticleVE_2_x86-64+3.efi"
+        good = counted.with_name("ParticleVE_2_x86-64.efi")
+        counted.rename(good)
+        self.backend.current_version = lambda: "2"
+        self.backend.current_esp_role = lambda: "a"
+        with patch("particleve.linux.run") as command:
+            self.assertEqual(self.backend.bless_current(), {"boot_blessed": "2", "esp_role": "a"})
+        command.assert_not_called()
+        self.assertTrue(good.exists())
+
     def test_firmware_esp_identity_must_belong_to_selected_pair(self):
         selected = "d75dc3d4-767e-4de2-a013-20fa67cea6f1"
         self.backend.manifest = {

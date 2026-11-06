@@ -127,7 +127,10 @@ class Linux:
                 len(entries) == 1 and hash_file(entries[0][0]) == release["artifacts"]["uki"]["sha256"],
                 "booted ESP does not hold the authenticated running UKI",
             )
-            run(["/usr/lib/systemd/systemd-bless-boot", f"--path={esp}", "good"])
+            # Native "good" rejects an entry already booted without a counter.
+            _, match = entries[0]
+            if match[1] is not None:
+                run(["/usr/lib/systemd/systemd-bless-boot", f"--path={esp}", "good"])
         return {"boot_blessed": current, "esp_role": role}
 
     @contextmanager
