@@ -336,8 +336,8 @@ Exit: the built image contains the intended package versions and required runtim
 - [x] Implement configurable layout sizing, per-device LUKS2, native Btrfs data/metadata RAID1, `/var`, separate encrypted mirrored swap, and the installation manifest.
 - [x] Omit the separate `/home` partition; disable destructive root reset and automatic writable-root rollback paths.
 - [x] Implement installation and independent ESP setup using explicit disk identities.
-- [ ] Enroll and test Secure Boot, verity verification, TPM unlock, and owner recovery.
-- [ ] Validate generic initrd discovery, bounded degraded boot, degraded writes, disk replacement, and restoration of RAID1 profiles and both boot paths.
+- [x] Enroll and test Secure Boot, verity verification, TPM unlock, and owner recovery.
+- [x] Validate generic initrd discovery, bounded degraded boot, degraded writes, disk replacement, and restoration of RAID1 profiles and both boot paths.
 
 Exit: either selected boot disk alone boots the intended verified OS and makes encrypted host/guest storage available. The active-`/usr` disk-loss limitation is documented and tested.
 
@@ -357,7 +357,7 @@ Exit: host administration, networking, storage, and the virtualization runtime w
 
 - [x] Implement transaction state, explicit per-disk transfers, ESP handling, locking, and rejected-release tracking.
 - [x] Add the conditional maintenance timer, pre-reboot VM shutdown check, temporary start/restart inhibition, health assessment, and recovery timeout/watchdog integration.
-- [ ] Exercise shutdown refusal, late exits, concurrent starts/restarts, interrupted maintenance, and restoration of only VMs stopped by the failed attempt.
+- [x] Exercise shutdown refusal, late exits, concurrent starts/restarts, interrupted maintenance, and restoration of only VMs stopped by the failed attempt.
 - [ ] Exercise normal update, interruptions, incomplete feed/disk state, failed boot, and retained-OS access to persistent Btrfs and VM auxiliary state.
 - [x] Verify OBS dependency-only and source-change rebuilds produce distinguishable complete releases.
 

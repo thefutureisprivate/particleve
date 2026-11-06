@@ -50,6 +50,14 @@ dev_rw_null(particleve_vmspawn_t)
 dev_rw_zero(particleve_vmspawn_t)
 udev_read_db(particleve_vmspawn_t)
 
+# Console PTYs belong to the controller's VM category pair. QEMU may use only
+# this dedicated terminal type; its existing MCS constraints separate VM pairs.
+type particleve_vmspawn_devpts_t;
+term_pty(particleve_vmspawn_devpts_t)
+term_create_pty(particleve_vmspawn_t, particleve_vmspawn_devpts_t)
+allow particleve_vmspawn_t particleve_vmspawn_devpts_t:chr_file { rw_chr_file_perms setattr };
+allow svirt_t particleve_vmspawn_devpts_t:chr_file rw_chr_file_perms;
+
 init_use_fds(particleve_vmspawn_t)
 init_use_notify(particleve_vmspawn_t)
 dbus_system_bus_client(particleve_vmspawn_t)

@@ -18,11 +18,14 @@ the host's disk encryption; public SSH keys live in homed user records and are
 retrieved by upstream userdb. Root's recovery home remains `/root`. SSH, console,
 TPM, disk replacement and fallback must pass commissioning on the actual host.
 
-This is an **uncommissioned implementation**. Image 21.1 has been built, signed,
-published in the [ParticleVE OBS project](https://build.opensuse.org/project/show/home:thefutureisprivate:particleve)
-and accepted by the signed-feed client. Boot and hardware acceptance remain release
-gates. Only disposable VM disks and copied virtual firmware have been altered. x86-64/v2 and example
-resource thresholds are candidate settings; measured minima remain unpublished.
+This is an **uncommissioned candidate**. Signed images are published in the
+[ParticleVE OBS project](https://build.opensuse.org/project/show/home:thefutureisprivate:particleve).
+Disposable tests cover verified boot, native OS updates, confined KVM guests,
+homed SSH, independent single-disk TPM unlock and encrypted data recovery.
+Only disposable VM disks and copied virtual firmware have been altered. Physical
+commissioning and automatic OS enablement are outside this delivery. x86-64/v2
+and example resource thresholds are candidate settings; production hardware
+coverage and measured minima remain unpublished.
 See [Status.md](Documentation/Status.md) for the exact validation boundary.
 
 ```sh
