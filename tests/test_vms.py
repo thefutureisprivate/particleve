@@ -1,9 +1,36 @@
 import copy
+import json
 import tempfile
 import unittest
+from types import SimpleNamespace
+from unittest.mock import patch
 
 from particleve.common import Deferred, Error, read_json
-from particleve.vms import Shutdown
+from particleve.vms import LinuxVMs, Shutdown
+
+
+class NativeInventoryTests(unittest.TestCase):
+    def test_intrinsic_host_entry_is_allowed_but_host_containers_still_block(self):
+        host = {"machine": ".host", "class": "host", "service": None}
+        container = {"machine": "unexpected", "class": "container", "service": "systemd-nspawn"}
+        for machines in ([host], [host, container]):
+            with (
+                self.subTest(machines=machines),
+                patch("particleve.vms.qemu_processes", return_value=[]),
+                patch(
+                    "particleve.vms.run",
+                    side_effect=[
+                        SimpleNamespace(stdout=""),
+                        SimpleNamespace(stdout=""),
+                        SimpleNamespace(stdout=json.dumps(machines)),
+                    ],
+                ),
+            ):
+                if container in machines:
+                    with self.assertRaisesRegex(Deferred, "unexpected host container"):
+                        LinuxVMs().inventory()
+                else:
+                    self.assertEqual(LinuxVMs().inventory(), [])
 
 
 class Platform:

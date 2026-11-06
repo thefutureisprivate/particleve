@@ -117,6 +117,8 @@ class LinuxVMs:
         machines = json.loads(run(["machinectl", "--all", "--output=json", "list"], timeout=15).stdout)
         result = []
         for machine in machines:
+            if machine["machine"] == ".host" and machine["class"] == "host":
+                continue  # Upstream --all includes the manager's intrinsic host entry.
             if machine["class"] != "vm":
                 raise Deferred("unexpected host container; VM maintenance inventory is incomplete")
             require(machine["service"] == "systemd-vmspawn", "unmanaged VM runner present")

@@ -9,10 +9,10 @@ have evidence.
 | Area | Current evidence | Still required |
 | --- | --- | --- |
 | Source/configuration | Full upstream Git history published; Fedora 45 native profile; runtime/initrd/tools stable-systemd inputs; resolved summary checks pass; all four source-change webhooks exercised | Complete image validation |
-| OBS | Old project deleted before uploads; new project and persistent signing key; all RPM builds passed; 27.1 accepted from the public feed with all six artifacts, GPG index, EFI signatures and UKI checks; rebuilding only the integration RPM produced 26.2 from 26.1 with unchanged Git sources and persistent-state versions | Boot acceptance of the revised runtime configuration |
+| OBS | Old project deleted before uploads; new project and persistent signing key; all RPM builds passed; 28.1 accepted from the public feed with all six artifacts, GPG index, EFI signatures and UKI checks; rebuilding only the integration RPM produced 26.2 from 26.1 with unchanged Git sources and persistent-state versions | Boot acceptance of the revised runtime configuration |
 | Host integration | Disposable 80 GiB pair installed with independent ESPs, Btrfs RAID1 and synchronized md/LUKS swap; marked unselected disk unchanged; 27.1 reached normal runtime with verified `/usr`, encrypted swap, enforcing SELinux and root SSH after prototype configuration repairs | Fresh signed image must reproduce those repairs, cold-home SSH and successful native blessing; then TPM enrollment, degraded boots and replacement |
 | Update maintenance | Durable lock/version/state, two-disk hash verification, boot counters/quarantine, Berlin window, bounded ACPI shutdown and abort restoration | Real sysupdate/ESP interruptions, boot failure/watchdog/fallback, external startup policy and retained-state compatibility |
-| Local checks | Ruff and shell syntax; 60 tests including disposable GPG signatures, dirty-file signature-slot overwrite, final driver retention, inactive required-service detection, private/public configuration modes, authenticated ESP blessing, interrupted transactions and VM failure recovery | Unit tests do not replace normal-boot and hardware acceptance |
+| Local checks | Ruff and shell syntax; 65 tests including disposable GPG signatures, dirty-file signature-slot overwrite, final driver retention, inactive required-service detection, private/public configuration modes, authenticated ESP blessing, fallback after failed blessing, supervised activation, native host inventory, interrupted transactions and VM failure recovery | Unit tests do not replace normal-boot and hardware acceptance |
 | Firmware | Signed helper package and metadata-only refresh integration; persistent manual-maintenance exclusion | Device discovery/ESP selection and supervised real update, or evidence no eligible update exists |
 | Commissioning | Evidence-bound command; all automatic OS timers disabled by default | Full acceptance matrix, Intel/AMD and controller/NIC variation, measured memory/capacity minima, unattended update and no-update window |
 
@@ -48,6 +48,16 @@ These tests used writable prototype SSH/network configuration on 27.1; they do
 not establish unattended first boot of the revised image. Native boot blessing
 also exposed missing SELinux file permissions on selected ESPs; the narrow image
 policy and explicit ESP selection still need a signed-image boot test.
+
+28.1 installed on a fresh disposable pair with preseeded machine identity, the
+headless target, readable network configuration, RAID1 data/metadata/system and
+clean mirrored swap; the unselected disk remained unchanged. Its first boot
+skipped the interactive setup prompts and reached normal userspace. Assessment
+then correctly rejected inactive auditd: SELinux denied reading the `/etc/audit`
+symlink. The journal also exposed a firewall/socket ordering cycle. Source now
+uses the ordinary `/etc` link type for both audit/SELinux factory links and early
+firewall dependencies, and verifies the full multi-user transaction during image
+builds. Fresh-boot acceptance remains open until those corrections pass.
 
 The separate initrd watchdog now uses systemd's initrd presets and survives
 emergency isolation. A real isolation test with the exact revised units, a

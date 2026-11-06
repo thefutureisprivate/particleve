@@ -202,6 +202,7 @@ def root_check(root, *, tree="usr", output=None):
                 *units,
                 "systemd-vmspawn@particleve-verify.service",
                 "sshd.socket",
+                "multi-user.target",
             ],
             timeout=120,
         )

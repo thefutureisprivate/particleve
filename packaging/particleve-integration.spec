@@ -57,6 +57,8 @@ python3 -W error -m unittest discover -v
 %install
 install -d %{buildroot}%{_prefix}/lib/particleve/particleve
 install -m0644 particleve/*.py %{buildroot}%{_prefix}/lib/particleve/particleve/
+install -d %{buildroot}%{_prefix}/lib/particleve/trust
+install -m0644 mkosi.extra/usr/lib/particleve/trust/* %{buildroot}%{_prefix}/lib/particleve/trust/
 install -D -m0755 bin/particleve %{buildroot}%{_bindir}/particleve
 install -D -m0755 bin/particleve-homed-account %{buildroot}%{_libexecdir}/particleve-homed-account
 install -d %{buildroot}%{_prefix}/lib/particleve-build/particleve
@@ -69,6 +71,7 @@ install -D -m0755 tools/obs-postoutput %{buildroot}%{_libexecdir}/particleve-obs
 %{_bindir}/particleve
 %{_libexecdir}/particleve-homed-account
 %{_prefix}/lib/particleve/particleve
+%{_prefix}/lib/particleve/trust
 
 %files -n particleve-build-tools
 %license LICENSE

@@ -1,7 +1,10 @@
 [Unit]
 Description=ParticleVE host management input filtering
-Before=network-pre.target sshd.socket
+DefaultDependencies=no
+After=local-fs.target
+Before=network-pre.target sshd.socket shutdown.target
 Wants=network-pre.target
+Conflicts=shutdown.target
 
 [Service]
 Type=oneshot

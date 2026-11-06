@@ -170,6 +170,10 @@ class Backend:
     def accept(self, version):
         self.event("accept-" + version)
 
+    def bless_current(self):
+        self.event("bless")
+        return {"boot_blessed": self.current}
+
     def cleanup_cache(self):
         self.event("cleanup")
 

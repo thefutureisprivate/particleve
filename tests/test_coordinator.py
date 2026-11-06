@@ -22,9 +22,30 @@ class CoordinatorTests(unittest.TestCase):
         self.assertEqual(self.coordinator.reboot(now=self.window)["action"], "deferred")
         self.backend.current, self.backend.boot = "2", "second-boot"
         self.coordinator.assess()
+        self.assertIsNotNone(self.coordinator.load()["pending"])
+        self.coordinator.bless()
         self.assertIsNone(self.coordinator.load()["pending"])
         self.assertEqual(self.coordinator.prepare()["reason"], "no newer OS release")
         self.assertEqual(self.backend.calls.count("reboot"), 1)
+
+    def test_failed_native_blessing_keeps_activation_for_fallback_quarantine(self):
+        self.coordinator.prepare()
+        self.coordinator.reboot(now=self.window)
+        self.backend.current, self.backend.boot = "2", "candidate-boot"
+        self.coordinator.assess()
+        self.backend.fail_at = "bless"
+        with self.assertRaises(OSError):
+            self.coordinator.bless()
+        self.assertEqual(self.coordinator.load()["pending"]["phase"], "booting")
+        self.backend.current, self.backend.boot, self.backend.fail_at = "1", "fallback-boot", None
+        self.coordinator.runtime_guard()
+        self.assertIn("2", self.coordinator.load()["rejected"])
+        self.assertIsNone(self.coordinator.load()["pending"])
+
+    def test_unassessed_boot_cannot_clear_its_counter(self):
+        with self.assertRaisesRegex(Error, "boot assessment"):
+            self.coordinator.bless()
+        self.assertNotIn("bless", self.backend.calls)
 
     def test_interruptions_at_every_resource_boundary_resume_same_version(self):
         boundaries = [
@@ -129,6 +150,37 @@ class CoordinatorTests(unittest.TestCase):
         self.backend.stop_vms = refuse
         result = self.coordinator.reboot(now=self.window)
         self.assertEqual(result["action"], "deferred")
+        self.assertIn("restore-vms", self.backend.calls)
+        self.assertNotIn("reboot", self.backend.calls)
+        self.assertEqual(self.coordinator.load()["pending"]["phase"], "ready")
+
+    def test_supervised_activation_before_commissioning_requires_manual_flag(self):
+        self.backend.commissioned = False
+        self.coordinator.prepare(automatic=False)
+        self.assertEqual(self.coordinator.reboot(now=self.window)["reason"], "not commissioned")
+        self.assertNotIn("freeze-vms", self.backend.calls)
+        daytime = datetime(2026, 11, 6, 9, 0, tzinfo=UTC)
+        result = self.coordinator.reboot(now=daytime, automatic=False)
+        self.assertEqual(result["action"], "activation-requested")
+        self.assertLess(self.backend.calls.index("stop-vms"), self.backend.calls.index("reboot"))
+
+    def test_manual_activation_retains_firmware_storage_and_shutdown_guards(self):
+        self.backend.commissioned = False
+        self.coordinator.prepare(automatic=False)
+        for blocker in ("firmware", "disk"):
+            with self.subTest(blocker=blocker):
+                self.backend.blocked = blocker
+                self.assertEqual(self.coordinator.reboot(automatic=False)["action"], "deferred")
+                self.assertNotIn("freeze-vms", self.backend.calls)
+        self.backend.blocked = None
+
+        def firmware_appears_during_shutdown():
+            self.backend.event("stop-vms")
+            self.backend.blocked = "firmware"
+
+        self.backend.stop_vms = firmware_appears_during_shutdown
+        result = self.coordinator.reboot(automatic=False)
+        self.assertEqual(result["reason"], "staged firmware")
         self.assertIn("restore-vms", self.backend.calls)
         self.assertNotIn("reboot", self.backend.calls)
         self.assertEqual(self.coordinator.load()["pending"]["phase"], "ready")

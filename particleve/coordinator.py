@@ -136,17 +136,17 @@ class Coordinator:
                 self.reason(state, f"preparation failed: {exc}")
                 raise
 
-    def reboot(self, *, now=None):
+    def reboot(self, *, now=None, automatic=True):
         with lock(self.directory):
             state = self.load()
             vm_attempt = False
             try:
                 self.reconcile(state)
-                if not reboot_window(
+                if automatic and not reboot_window(
                     now or datetime.now(UTC), self.backend.config["maintenance"]["start_tolerance_seconds"]
                 ):
                     raise Deferred("outside the 04:30 Europe/Berlin window")
-                self.guard(state, automatic=True)
+                self.guard(state, automatic=automatic)
                 pending = state["pending"]
                 if not pending or pending["phase"] != "ready":
                     raise Deferred("no complete pending release")
@@ -166,7 +166,7 @@ class Coordinator:
                 vm_attempt = True
                 self.backend.freeze_vms()
                 self.backend.stop_vms()
-                self.guard(state, automatic=True)
+                self.guard(state, automatic=automatic)
                 for disk in ("a", "b"):
                     require(
                         self.backend.verify_disk(disk, release, boot=True),
@@ -228,12 +228,27 @@ class Coordinator:
             self.backend.accept(current)
             if current not in state["accepted"]:
                 state["accepted"].append(current)
-            if state["pending"] and state["pending"]["version"] == current:
-                state["pending"] = None
             state["last_reason"] = f"release {current} passed bounded boot assessment"
             self.save(state)
-            self.backend.cleanup_cache()
             return {"action": "accepted", "version": current}
+
+    def bless(self):
+        with lock(self.directory):
+            state = self.load()
+            current = self.backend.current_version()
+            require(
+                current in state["accepted"] and current not in state["rejected"],
+                "boot assessment must accept the running OS before blessing",
+            )
+            result = self.backend.bless_current()
+            # Keep activation durable until native boot counting has succeeded.
+            # A failed blessing must still quarantine this candidate after fallback.
+            if state["pending"] and state["pending"]["version"] == current:
+                state["pending"] = None
+            state["last_reason"] = f"release {current} passed assessment and native boot blessing"
+            self.save(state)
+            self.backend.cleanup_cache()
+            return result
 
     def maintenance(self, reason=None, *, reviewed=False):
         with lock(self.directory):

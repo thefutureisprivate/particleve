@@ -20,6 +20,11 @@ def parser():
     commands.add_parser("preflight", help="read-only hardware capability report")
     render = commands.add_parser("render-network")
     render.add_argument("--output", required=True, help="staging directory, never activated automatically")
+    fetching = commands.add_parser("fetch-release", help="download and authenticate a complete OS release")
+    fetching.add_argument("--output", required=True, help="release cache directory")
+    fetching.add_argument("--version", help="specific published version; otherwise select the newest")
+    fetching.add_argument("--keyring", default="/usr/lib/particleve/trust/releases.gpg")
+    fetching.add_argument("--certificate", default="/usr/lib/particleve/trust/secure-boot.crt")
     for name in ("plan", "install"):
         sub = commands.add_parser(name)
         sub.add_argument("--release-dir", required=True)
@@ -37,12 +42,17 @@ def parser():
         action="store_true",
         help="allow preparation before commissioning; all safety guards still apply",
     )
+    activation = commands.add_parser("activate")
+    activation.add_argument(
+        "--manual",
+        action="store_true",
+        help="activate now before commissioning; retain disk, firmware and graceful VM shutdown guards",
+    )
     enrollment = commands.add_parser(
         "enroll-tpm", help="enroll from the verified normal boot, preserving recovery slots"
     )
     enrollment.add_argument("--recovery-key-file", required=True)
     for name in (
-        "activate",
         "assess",
         "bless-current",
         "runtime-guard",
@@ -82,6 +92,11 @@ def execute(args):
     if args.command == "render-network":
         network.write(host, args.output)
         result = {"output": str(Path(args.output).resolve())}
+    elif args.command == "fetch-release":
+        destination, manifest = release.fetch(
+            host["feed"], args.output, args.keyring, args.certificate, version=args.version
+        )
+        result = {"release_dir": str(destination.resolve()), "version": manifest["version"]}
     elif args.command == "plan":
         manifest = release.verify_directory(args.release_dir, args.keyring, args.certificate)
         proposed = install.plan(host, manifest)
@@ -108,18 +123,11 @@ def execute(args):
             with lock(args.state_dir):
                 result = install.enroll_tpm(backend, args.recovery_key_file, coordinator.load())
         elif args.command == "activate":
-            result = coordinator.reboot()
+            result = coordinator.reboot(automatic=not args.manual)
         elif args.command == "assess":
             result = coordinator.assess()
         elif args.command == "bless-current":
-            with lock(args.state_dir):
-                state = coordinator.load()
-                current = backend.current_version()
-                require(
-                    current in state["accepted"] and current not in state["rejected"],
-                    "boot assessment must accept the running OS before blessing",
-                )
-                result = backend.bless_current()
+            result = coordinator.bless()
         elif args.command == "runtime-guard":
             backend.check_storage(healthy=False)
             coordinator.runtime_guard()
@@ -165,12 +173,15 @@ def execute(args):
             with lock(args.state_dir):
                 state = coordinator.load()
                 pending = state["pending"]
-                if (
-                    run(["systemctl", "is-active", "--quiet", "boot-complete.target"], check=False).returncode
-                    == 0
+                if all(
+                    run(["systemctl", "is-active", "--quiet", unit], check=False).returncode == 0
+                    for unit in ("boot-complete.target", "systemd-bless-boot.service")
                 ):
                     result = {"boot": "already complete"}
                 elif pending and pending["version"] == backend.current_version():
+                    pending["phase"] = "booting"
+                    pending["boot_id"] = backend.boot_id()
+                    coordinator.save(state)
                     run(["systemctl", "--no-block", "reboot"])
                     result = {"failed_candidate": "retry/fallback requested through boot counting"}
                 else:

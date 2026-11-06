@@ -5,10 +5,16 @@ UEFI, Secure Boot, TPM2 and KVM support. Copy `examples/host.json` outside the
 checkout and configure stable whole-disk by-id paths and serials, permanent NIC
 MACs, network topology, management allowlists, SSH public keys, resource reserves
 and the real signed feed. Inspect a read-only preflight before preparing a plan.
+Install the ParticleVE integration RPM from the owner-trusted OBS repository;
+it includes the public release-verification material. Authenticate its repository
+key independently before importing it. `fetch-release` verifies the signed index,
+complete artifact hashes, EFI signatures and UKI metadata before returning a
+release directory; it does not change installation disks.
 
 ```sh
 particleve --config /run/host.json preflight
-particleve --config /run/host.json plan --release-dir /run/release --output /run/install-plan.json
+particleve --config /run/host.json fetch-release --output /run/releases
+particleve --config /run/host.json plan --release-dir /run/releases/VERSION --output /run/install-plan.json
 ```
 
 Review the complete plan, including serials, smaller-disk sizing and every
@@ -105,6 +111,13 @@ blessing; failed candidates exhaust bounded attempts and fall back. The retained
 OS quarantines failed releases before VM runtime access. Changed Btrfs/systemd/
 QEMU/firmware state contracts require explicit evidence that the retained OS can
 read current state; no writable-state or guest-state migration is automatic.
+
+Before commissioning, supervised update acceptance uses `particleve prepare
+--manual`, then `particleve activate --manual`. Manual activation starts immediately
+and permits an uncommissioned host; it retains firmware exclusion, complete
+two-disk verification, a blessed fallback and graceful VM shutdown/restoration.
+It does not enable either automatic timer. The timer always uses plain `activate`
+and requires commissioning and the 04:30 window.
 
 For disk replacement, enter persistent maintenance, physically identify the failed
 member and select its role. `replace-disk --role … --disk /dev/disk/by-id/… --serial …`
