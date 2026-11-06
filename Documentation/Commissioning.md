@@ -1,6 +1,8 @@
 # Commissioning
 
-Automatic OS work is disabled in the factory presets. Commission only the exact
+Automatic OS work is disabled in the factory presets. Initial TPM enrollment
+runs explicitly from the first verified normal boot using `particleve enroll-tpm`;
+commissioning checks that its record covers all three current LUKS devices. Commission only the exact
 installed image, selected disk pair and installation configuration, after the
 acceptance matrix in PLAN.md has passed. `examples/acceptance.json` is an evidence
 schema, not a record of completed validation. Fill its image/installation identity,

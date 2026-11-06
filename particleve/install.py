@@ -6,6 +6,7 @@ import shutil
 import stat
 import tempfile
 import uuid
+from datetime import UTC, datetime
 from pathlib import Path
 
 from . import inventory, network
@@ -113,9 +114,28 @@ def validate_keyfile(path):
         "keep the independent recovery key in /run, outside installed storage",
     )
     require(16 <= st.st_size <= 4096, "recovery key must be 16..4096 bytes")
+    require(
+        all(32 <= byte <= 126 for byte in path.read_bytes()),
+        "recovery passphrase must be printable ASCII without a trailing newline for console unlock",
+    )
 
 
-def format_encrypted(source, name, keyfile):
+def enroll_source(source, keyfile):
+    run(
+        [
+            "systemd-cryptenroll",
+            f"--unlock-key-file={keyfile}",
+            "--tpm2-device=auto",
+            "--tpm2-pcrs=7",
+            "--tpm2-public-key=/usr/lib/particleve/trust/pcr-public-key.pem",
+            "--tpm2-public-key-pcrs=11",
+            source,
+        ],
+        timeout=300,
+    )
+
+
+def format_encrypted(source, name, keyfile, *, enroll):
     run(
         [
             "cryptsetup",
@@ -131,18 +151,8 @@ def format_encrypted(source, name, keyfile):
         timeout=300,
     )
     run(["cryptsetup", "open", "--key-file", keyfile, source, name], timeout=300)
-    run(
-        [
-            "systemd-cryptenroll",
-            f"--unlock-key-file={keyfile}",
-            "--tpm2-device=auto",
-            "--tpm2-pcrs=7",
-            "--tpm2-public-key=/usr/lib/particleve/trust/pcr-public-key.pem",
-            "--tpm2-public-key-pcrs=11",
-            source,
-        ],
-        timeout=300,
-    )
+    if enroll:
+        enroll_source(source, keyfile)
     return run(["cryptsetup", "luksUUID", source]).stdout.strip()
 
 
@@ -150,12 +160,55 @@ def block_uuid(path, field="UUID"):
     return run(["blkid", "-s", field, "-o", "value", path]).stdout.strip()
 
 
+def enrollment_uuids(manifest):
+    return sorted([d["state_luks_uuid"] for d in manifest["devices"]] + [manifest["swap"]["luks_uuid"]])
+
+
+def enroll_tpm(backend, keyfile, state):
+    """Bind PCR7 from the normal verified boot, never from the recovery installer."""
+    validate_keyfile(keyfile)
+    require(not state["pending"], "finish or cancel the pending OS transaction before TPM enrollment")
+    require(
+        not (backend.directory / "commissioned.json").exists() or state["maintenance"],
+        "enter persistent maintenance before changing a commissioned host's TPM policy",
+    )
+    require(inventory.secure_boot(), "TPM enrollment requires the normal Secure Boot chain")
+    backend.check_storage(healthy=True)
+    backend.check_firmware_clear()
+    release = backend.release(backend.current_version())
+    for role in ("a", "b"):
+        require(
+            backend.verify_disk(role, release, boot=True), "verify both current boot paths before enrollment"
+        )
+    for device in backend.manifest["devices"]:
+        enroll_source(member(device, "state"), keyfile)
+    enroll_source("/dev/md/particleve-swap", keyfile)
+    # Native cryptenroll reuses an existing matching policy. Interrupted attempts
+    # can be repeated; no recovery slot or existing TPM slot is wiped here.
+    write_json(
+        backend.directory / "tpm-enrollment.json",
+        {
+            "schema": 1,
+            "policy": backend.config["tpm_policy"],
+            "luks_uuids": enrollment_uuids(backend.manifest),
+            "image_version": backend.current_version(),
+            "boot_id": backend.boot_id(),
+            "recorded_at": datetime.now(UTC).isoformat(),
+        },
+    )
+    return {
+        "action": "tpm-enrolled",
+        "policy": backend.config["tpm_policy"],
+        "next": "test unattended unlock from both boot disks before commissioning",
+    }
+
+
 def create_writable(proposed, keyfile):
     from .storage import members
 
     for device in proposed["devices"]:
         name = f"particleve-state-{device['role']}"
-        device["state_luks_uuid"] = format_encrypted(member(device, "state"), name, keyfile)
+        device["state_luks_uuid"] = format_encrypted(member(device, "state"), name, keyfile, enroll=False)
     state_paths = [f"/dev/mapper/particleve-state-{d['role']}" for d in proposed["devices"]]
     run(
         ["mkfs.btrfs", "--data=raid1", "--metadata=raid1", "--label=ParticleVE-root", *state_paths],
@@ -185,7 +238,7 @@ def create_writable(proposed, keyfile):
         ],
         timeout=300,
     )
-    swap_luks = format_encrypted(swap_md, "particleve-swap", keyfile)
+    swap_luks = format_encrypted(swap_md, "particleve-swap", keyfile, enroll=False)
     run(["mkswap", "-L", "ParticleVE-swap", "/dev/mapper/particleve-swap"])
     return {
         "btrfs": {
@@ -313,6 +366,7 @@ def install(config, release_directory, proposed, confirmation, keyfile, *, keyri
         "action": "installed",
         "version": release["version"],
         "automatic_updates": False,
+        "tpm_enrollment": "required from the first verified normal boot",
         "next": "validate independent/degraded boots and owner recovery, then commission",
     }
 
@@ -376,7 +430,7 @@ def replace(config, backend, role, replacement, *, confirmation=None, keyfile=No
     run(["mkfs.vfat", "-F", "32", member(device, "esp")])
     write_os(device, release, backend.cache / release["version"])
     mapper = f"particleve-state-{role}"
-    device["state_luks_uuid"] = format_encrypted(member(device, "state"), mapper, keyfile)
+    device["state_luks_uuid"] = format_encrypted(member(device, "state"), mapper, keyfile, enroll=True)
     device["btrfs_device_uuid"] = None
     record = json.loads(json.dumps(backend.manifest))
     record["devices"] = [device if d["role"] == role else d for d in record["devices"]]

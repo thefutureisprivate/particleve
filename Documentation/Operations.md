@@ -14,14 +14,25 @@ particleve --config /run/host.json plan --release-dir /run/release --output /run
 Review the complete plan, including serials, smaller-disk sizing and every
 partition. Installation deliberately erases both selected disks and requires the
 exact plan digest. No unselected device is a target. Keep an independent recovery
-secret in a root-owned mode-0600 regular file under `/run`; keep its durable copy
-off the host. Pass it using `install --recovery-key-file`, never a command-line
+passphrase in a root-owned mode-0600 regular file under `/run`; keep its durable
+copy off the host. Its file bytes must be printable ASCII without a trailing
+newline, so the same passphrase can unlock storage at the recovery console. Pass it using `install --recovery-key-file`, never a command-line
 secret value. Run `particleve install --help` for the required plan/confirmation
 arguments. Interrupted installations require owner recovery; they are not
 silently reformatted or migrated.
 
-Each state partition is independently LUKS2 encrypted and enrolled for PCR7 plus
-signed PCR11. Both mappings form a single Btrfs filesystem with RAID1 data and
+Each state partition is independently LUKS2 encrypted. On the first installed
+boot, enter the owner recovery passphrase at the console. From that verified
+normal boot, provide the passphrase file in `/run` and enroll PCR7 plus signed
+PCR11 authorization:
+
+```sh
+particleve enroll-tpm --recovery-key-file /run/owner-recovery-passphrase
+```
+
+The recovery installer deliberately does not bind its own PCR7 measurements.
+Enrollment verifies both installed boot paths and retains all recovery slots.
+Reboot and prove unattended unlock from each disk before commissioning. Both mappings form a single Btrfs filesystem with RAID1 data and
 metadata. The writable root is never factory-reset or rewound during OS fallback.
 `/var` and `/var/lib/machines` are subvolumes. There is no separate home partition
 or VM volume manager. Swap alone uses md RAID1 followed by LUKS2 and block swap.
@@ -91,7 +102,8 @@ device, resynchronizes swap and provisions complete OS slots/ESP on the new disk
 `finalize-replacement` refuses completion until replacement/resync finish and all
 allocated Btrfs data/metadata/system profiles are RAID1. Interrupted replacement
 requires owner review of its durable journal. Test both independent boot paths
-and recommission the changed installation before enabling automation again.
+and run `enroll-tpm` under maintenance to refresh enrollment evidence for the
+changed LUKS device set. Recommission before enabling automation again.
 
 Losing the disk serving active verified `/usr` can interrupt operation even when
 writable RAID1 survives. Use the other firmware boot path or independent recovery

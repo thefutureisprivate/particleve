@@ -8,9 +8,8 @@ BuildArch:      noarch
 BuildRequires:  python3 >= 3.14
 BuildRequires:  gnupg2
 Requires:       python3 >= 3.14
-Requires:       /usr/lib/systemd/systemd-sysupdate
-Requires:       /usr/bin/homectl
-Requires:       /usr/bin/machinectl
+Requires:       systemd-udev
+Requires:       systemd-container
 Requires:       mdadm
 Requires:       cryptsetup
 Requires:       btrfs-progs

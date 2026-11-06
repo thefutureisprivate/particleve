@@ -29,11 +29,17 @@ def check():
     # NSS enumeration includes homed records. Audit only the classic local database.
     rows = [line.split(":") for line in Path("/etc/passwd").read_text().splitlines() if line]
     require(all(len(row) == 7 for row in rows), "malformed local passwd database")
+    shells = {
+        line.strip()
+        for line in Path("/etc/shells").read_text().splitlines()
+        if line.strip() and not line.lstrip().startswith("#")
+    }
     classic = [
         row[0]
         for row in rows
         if row[0] != "root"
         and row[6] not in ("/sbin/nologin", "/usr/sbin/nologin", "/bin/false", "/usr/bin/false")
+        and (1000 <= int(row[2]) < 60000 or row[6] in shells)
     ]
     require(
         not classic,

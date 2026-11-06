@@ -32,6 +32,17 @@ class AccountStorageTests(unittest.TestCase):
         ):
             accounts.check()
 
+    def test_nonlogin_system_commands_are_not_classic_login_shells(self):
+        def contents(path):
+            return (
+                ("root:x:0:0::/root:/bin/bash\nsync:x:5:0::/sbin:/bin/sync\nhalt:x:7:0::/sbin:/sbin/halt\n")
+                if str(path) == "/etc/passwd"
+                else "/bin/bash\n"
+            )
+
+        with patch.object(accounts.Path, "read_text", contents), patch.object(accounts, "run"):
+            self.assertEqual(accounts.check()["non_root_logins"], "homed")
+
     def test_btrfs_allocation_profiles_include_every_allocated_group(self):
         report = profiles(
             "Data, RAID1: total=1000, used=100\nMetadata, RAID1: total=200, used=20\n"

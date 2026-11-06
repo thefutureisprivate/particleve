@@ -40,6 +40,8 @@ SCENARIOS = (
 
 
 def commission(backend, evidence_path, *, enable=False):
+    from .install import enrollment_uuids
+
     evidence = read_json(evidence_path)
     require(evidence.get("schema") == 1, "unknown acceptance record schema")
     require(evidence.get("approved_by"), "record the commissioning owner")
@@ -70,6 +72,13 @@ def commission(backend, evidence_path, *, enable=False):
     backend.health()
     backend.check_storage(healthy=True)
     backend.check_firmware_clear()
+    enrollment = read_json(backend.directory / "tpm-enrollment.json")
+    require(
+        enrollment.get("schema") == 1
+        and enrollment.get("policy") == backend.config["tpm_policy"]
+        and enrollment.get("luks_uuids") == enrollment_uuids(backend.manifest),
+        "TPM enrollment does not cover this installation; enroll from its verified normal boot",
+    )
     record = {
         "schema": 1,
         "installation_sha256": digest(backend.manifest),

@@ -37,6 +37,10 @@ def parser():
         action="store_true",
         help="allow preparation before commissioning; all safety guards still apply",
     )
+    enrollment = commands.add_parser(
+        "enroll-tpm", help="enroll from the verified normal boot, preserving recovery slots"
+    )
+    enrollment.add_argument("--recovery-key-file", required=True)
     for name in (
         "activate",
         "assess",
@@ -99,6 +103,9 @@ def execute(args):
         coordinator = Coordinator(args.state_dir, backend)
         if args.command == "prepare":
             result = coordinator.prepare(automatic=not args.manual)
+        elif args.command == "enroll-tpm":
+            with lock(args.state_dir):
+                result = install.enroll_tpm(backend, args.recovery_key_file, coordinator.load())
         elif args.command == "activate":
             result = coordinator.reboot()
         elif args.command == "assess":

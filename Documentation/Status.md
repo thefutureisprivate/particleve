@@ -8,11 +8,11 @@ have evidence.
 
 | Area | Current evidence | Still required |
 | --- | --- | --- |
-| Source/configuration | Full upstream Git history and signed implementation published; Fedora 45 native profile; runtime/initrd/tools stable-systemd inputs; resolved summary checks pass | Publish the remaining build fixes; register source-change webhooks |
+| Source/configuration | Full upstream Git history and signed implementation published; Fedora 45 native profile; runtime/initrd/tools stable-systemd inputs; resolved summary checks pass | Four source-change webhooks verified against commit fa47b6b; complete image validation remains |
 | OBS | Old ParticleOS project deleted before uploads; new owned project and persistent signing key created; separately PE-signed fwupd helper build passed | Integration and pinned mkosi builds passed; complete native image signing/publication, dependency/source rebuild evidence |
 | Host integration | Geometry/stable identity validation, Btrfs RAID1 over per-device LUKS2, md/LUKS swap, independent ESPs, homed/userdb SSH, networkd/nftables, vmspawn template integration | Disposable-disk installation, cold-home SSH, actual initrd/TPM/verity boot, both degraded boot paths and replacement |
 | Update maintenance | Durable lock/version/state, two-disk hash verification, boot counters/quarantine, Berlin window, bounded ACPI shutdown and abort restoration | Real sysupdate/ESP interruptions, boot failure/watchdog/fallback, external startup policy and retained-state compatibility |
-| Local checks | Ruff and shell syntax; 42 tests including actual disposable GPG signatures, temporary ESP counter/capsule preservation, interrupted transactions and VM refusal/late exit/recovery | Unit tests do not exercise actual QEMU, firmware, TPM, SELinux or block devices |
+| Local checks | Ruff and shell syntax; 47 tests including actual disposable GPG signatures, temporary ESP counter/capsule preservation, interrupted transactions and VM refusal/late exit/recovery | Unit tests do not exercise actual QEMU, firmware, TPM, SELinux or block devices |
 | Firmware | Signed helper package and metadata-only refresh integration; persistent manual-maintenance exclusion | Device discovery/ESP selection and supervised real update, or evidence no eligible update exists |
 | Commissioning | Evidence-bound command; all automatic OS timers disabled by default | Full acceptance matrix, Intel/AMD and controller/NIC variation, measured memory/capacity minima, unattended update and no-update window |
 

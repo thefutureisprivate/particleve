@@ -11,7 +11,7 @@ test:
 lint:
 	$(RUFF) check .
 	$(RUFF) format --check .
-	bash -n mkosi.postinst.chroot mkosi.finalize mkosi.initrd.conf/mkosi.extra/usr/libexec/particleve-initrd-storage
+	bash -n mkosi.postinst.chroot mkosi.finalize mkosi.initrd.conf/mkosi.postinst mkosi.initrd.conf/mkosi.extra/usr/libexec/particleve-initrd-storage
 
 sources:
 	$(PYTHON) tools/fetch-sources.py
