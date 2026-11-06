@@ -5,12 +5,23 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from particleve import common, inventory, network
+from particleve import cli, common, inventory, network
 from particleve.common import Error
 from tests.fixtures import host
 
 
 class RuntimeBootTests(unittest.TestCase):
+    def test_unprivileged_firewall_command_cannot_change_packet_filtering(self):
+        args = cli.parser().parse_args(["apply-firewall"])
+        with (
+            patch.object(cli, "read_json", return_value=host()),
+            patch.object(cli.os, "geteuid", return_value=1000),
+            patch.object(cli, "run") as commands,
+            self.assertRaisesRegex(Error, "requires root"),
+        ):
+            cli.execute(args)
+        commands.assert_not_called()
+
     def test_public_daemon_configuration_is_readable_with_private_umask(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

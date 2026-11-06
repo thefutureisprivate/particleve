@@ -127,6 +127,8 @@ def root_check(root, *, tree="usr", output=None):
             "usr/bin/homectl",
             "usr/bin/userdbctl",
             "usr/bin/systemd-vmspawn",
+            "usr/bin/swtpm_setup",
+            "usr/bin/swtpm_localca",
             "usr/lib/systemd/systemd-sysupdate",
             "usr/lib/systemd/system/systemd-vmspawn@.service",
             "usr/share/zoneinfo/Europe/Berlin",

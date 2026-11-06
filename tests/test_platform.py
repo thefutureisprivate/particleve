@@ -79,7 +79,7 @@ class PlatformTests(unittest.TestCase):
         physical = rendered["etc/systemd/network/30-particleve-mgmt0.network"]
         self.assertIn("Bridge=br0", physical)
         self.assertNotIn("Address=", physical)
-        firewall = rendered["etc/particleve/host.nft"]
+        firewall = network.firewall(candidate)
         self.assertIn("ip6 saddr 2001:db8:1::/64", firewall)
         self.assertNotIn("flush ruleset", firewall)
         self.assertNotIn("forward", firewall)
@@ -120,15 +120,22 @@ class PlatformTests(unittest.TestCase):
         )
 
     def test_transfers_target_both_explicit_disks_and_preserve_running_release(self):
+        manifest = fixture_release()
+        for item in manifest["artifacts"].values():
+            if "partition_uuid" in item:
+                item["file"] = item["file"].replace(
+                    item["partition_uuid"], item["partition_uuid"].replace("-", "")
+                )
         for disk in host()["disks"]:
             definitions = release.transfers(
-                fixture_release(), disk=disk["path"], source="/var/cache/particleve/2", current="1"
+                manifest, disk=disk["path"], source="/var/cache/particleve/2", current="1"
             )
             self.assertEqual(len(definitions), 3)
-            for text in definitions.values():
+            for kind, text in zip(("verity_sig", "verity", "usr"), definitions.values(), strict=True):
                 self.assertIn("Path=" + disk["path"], text)
                 self.assertIn("ProtectVersion=1", text)
-                self.assertIn("@u", text)
+                self.assertIn("PartitionUUID=" + manifest["artifacts"][kind]["partition_uuid"], text)
+                self.assertNotIn("PathRelativeTo=explicit", text)
                 self.assertNotIn("Path=auto", text)
                 self.assertNotIn("--reboot", text)
 

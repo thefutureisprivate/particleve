@@ -10,9 +10,9 @@ have evidence.
 | --- | --- | --- |
 | Source/configuration | Full upstream Git history published; Fedora 45 native profile; runtime/initrd/tools stable-systemd inputs; resolved summary checks pass; all four source-change webhooks exercised | Complete image validation |
 | OBS | Old project deleted before uploads; new project and persistent signing key; all RPM builds passed; 28.1 accepted from the public feed with all six artifacts, GPG index, EFI signatures and UKI checks; rebuilding only the integration RPM produced 26.2 from 26.1 with unchanged Git sources and persistent-state versions | Boot acceptance of the revised runtime configuration |
-| Host integration | Disposable 80 GiB pair installed with independent ESPs, Btrfs RAID1 and synchronized md/LUKS swap; marked unselected disk unchanged; 27.1 reached normal runtime with verified `/usr`, encrypted swap, enforcing SELinux and root SSH after prototype configuration repairs | Fresh signed image must reproduce those repairs, cold-home SSH and successful native blessing; then TPM enrollment, degraded boots and replacement |
-| Update maintenance | Durable lock/version/state, two-disk hash verification, boot counters/quarantine, Berlin window, bounded ACPI shutdown and abort restoration | Real sysupdate/ESP interruptions, boot failure/watchdog/fallback, external startup policy and retained-state compatibility |
-| Local checks | Ruff and shell syntax; 66 tests including disposable GPG signatures, dirty-file signature-slot overwrite, final driver retention, inactive required-service detection, private/public configuration modes, authenticated/idempotent ESP blessing, fallback after failed blessing, supervised activation, native host inventory, interrupted transactions and VM failure recovery | Unit tests do not replace normal-boot and hardware acceptance |
+| Host integration | Fresh 28.1 installation; repaired prototype passed homed SSH, independent ESP blessing and unattended TPM unlock from each boot disk; Btrfs RAID1 and synchronized md/LUKS swap; unselected marker unchanged | Fresh signed image incorporating all repairs, single-member boots and replacement |
+| Update maintenance | Revised native sysupdate definitions prepared authenticated 30.1 on both disks while 28.1 and a guest ran; real ACPI shutdown, concurrent-start refusal and aborted-maintenance restoration passed; guest disk/EFI markers survived restart | Native activation, interruptions, boot failure/watchdog/fallback, external startup policy and retained-state compatibility |
+| Local checks | Ruff and shell syntax; 67 tests including disposable GPG signatures, dirty-file signature-slot overwrite, final driver retention, inactive required-service detection, private/public configuration modes, authenticated/idempotent ESP blessing, fallback after failed blessing, supervised activation, firewall privilege checks, native host inventory, interrupted transactions and VM failure recovery | Unit tests do not replace normal-boot and hardware acceptance |
 | Firmware | Signed helper package and metadata-only refresh integration; persistent manual-maintenance exclusion | Device discovery/ESP selection and supervised real update, or evidence no eligible update exists |
 | Commissioning | Evidence-bound command; all automatic OS timers disabled by default | Full acceptance matrix, Intel/AMD and controller/NIC variation, measured memory/capacity minima, unattended update and no-update window |
 
@@ -71,6 +71,28 @@ the UKI was already good and had no counter. Source now treats an authenticated
 already-good current entry as success without invoking native counter mutation.
 Independent disk boot and a fresh image incorporating all repairs remain required.
 These prototype results do not establish fresh-image acceptance.
+
+The prototype subsequently booted from disk B without credential input and passed
+assessment, native blessing and runtime gating; both ESP entries are now good.
+A disposable Fedora guest runs through the packaged vmspawn template using KVM,
+TAP networking, guest readiness notification and persistent EFI state. Only its
+raw disk has NOCOW. Real testing found the missing `swtpm-tools` dependency, a
+DHCP request blocked by host-input filtering, and machinectl's need for repeated
+property options. Source addresses these and passed live native firewall/inventory
+checks. Guest vTPM, guest I/O/restart and maintenance acceptance remain open.
+The packaged VM processes currently run in `unconfined_service_t`; global SELinux
+enforcement alone does not establish guest process confinement. Commissioning
+must review that upstream policy coverage. Virtual disks expose no SMART data.
+
+Native update testing found two transfer-definition defects: `explicit` path
+anchors required an extra CLI source argument, and compact UUIDs in native
+artifact filenames were not captured by a hyphenated UUID replacement. Definitions
+now anchor absolute paths at the host root and set authenticated partition UUIDs
+directly. One earlier diagnostic transfer's inactive UUIDs were repaired only
+after matching all payload hashes, proving the candidate was unexposed and
+rechecking both current fallback copies. No retained migration was added.
+With revised definitions, native preparation completed both 30.1 OS sets and
+exposed each candidate UKI with three attempts; 28.1 and its guest stayed running.
 
 The separate initrd watchdog now uses systemd's initrd presets and survives
 emergency isolation. A real isolation test with the exact revised units, a

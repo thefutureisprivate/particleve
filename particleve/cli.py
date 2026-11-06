@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 from . import commission, config, install, inventory, network, release
-from .common import Error, digest, lock, read_json, require, run, write_json
+from .common import Error, atomic_write, digest, lock, read_json, require, run, write_json
 from .coordinator import Coordinator
 from .linux import Linux
 
@@ -18,6 +18,7 @@ def parser():
     p.add_argument("--state-dir", default="/var/lib/particleve")
     commands = p.add_subparsers(dest="command", required=True)
     commands.add_parser("preflight", help="read-only hardware capability report")
+    commands.add_parser("apply-firewall", help="apply this image's host-input policy to the configured host")
     render = commands.add_parser("render-network")
     render.add_argument("--output", required=True, help="staging directory, never activated automatically")
     fetching = commands.add_parser("fetch-release", help="download and authenticate a complete OS release")
@@ -91,7 +92,12 @@ def execute(args):
         return 0 if report["ok"] else 1
     if args.command == "render-network":
         network.write(host, args.output)
+        atomic_write(Path(args.output) / "host.nft", network.firewall(host).encode(), 0o644)
         result = {"output": str(Path(args.output).resolve())}
+    elif args.command == "apply-firewall":
+        require(os.geteuid() == 0, "applying the host firewall requires root")
+        run(["nft", "--file", "-"], input=network.firewall(host))
+        result = {"firewall": "active"}
     elif args.command == "fetch-release":
         destination, manifest = release.fetch(
             host["feed"], args.output, args.keyring, args.certificate, version=args.version

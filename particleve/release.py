@@ -207,13 +207,14 @@ def transfers(manifest, *, disk, source, current):
     files = {}
     for order, kind in enumerate(("verity_sig", "verity", "usr"), 10):
         item = manifest["artifacts"][kind]
-        filename = item["file"].replace(manifest["version"], "@v", 1).replace(item["partition_uuid"], "@u")
+        filename = item["file"].replace(manifest["version"], "@v", 1)
         suffix = {"usr": "", "verity": "_verity", "verity_sig": "_verity_sig"}[kind]
         files[f"{order}-{kind}.transfer"] = (
             f"[Transfer]\nProtectVersion={current}\nVerify=yes\n\n"
-            f"[Source]\nType=regular-file\nPath={source}\nPathRelativeTo=explicit\nMatchPattern={filename}\n\n"
-            f"[Target]\nType=partition\nPath={disk}\nPathRelativeTo=explicit\n"
+            f"[Source]\nType=regular-file\nPath={source}\nPathRelativeTo=root\nMatchPattern={filename}\n\n"
+            f"[Target]\nType=partition\nPath={disk}\nPathRelativeTo=root\n"
             f"MatchPattern=ParticleVE_@v{suffix}\nMatchPartitionType=usr{suffix.replace('_', '-')}\n"
+            f"PartitionUUID={item['partition_uuid']}\n"
             "PartitionFlags=0\nReadOnly=yes\nInstancesMax=2\n"
         )
     return files

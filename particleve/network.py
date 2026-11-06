@@ -45,22 +45,6 @@ def render(config):
         else:
             lines += ["", "[Link]", "RequiredForOnline=no"]
         files[f"etc/systemd/network/30-particleve-{device['name']}.network"] = "\n".join(lines) + "\n"
-    # Only our host-input table is replaced; external guest forwarding policy remains independent.
-    rules = [
-        "destroy table inet particleve_host",
-        "table inet particleve_host {",
-        "  chain input {",
-        "    type filter hook input priority 0; policy drop;",
-        '    iifname "lo" accept',
-        "    ct state invalid drop",
-        "    ct state established,related accept",
-        "    meta l4proto { icmp, ipv6-icmp } accept",
-    ]
-    for source in network["allowed_sources"]:
-        family = "ip6" if ":" in source else "ip"
-        rules.append(f'    iifname "{network["management"]}" {family} saddr {source} tcp dport 22 accept')
-    rules += ["  }", "}"]
-    files["etc/particleve/host.nft"] = "\n".join(rules) + "\n"
     files["etc/systemd/timesyncd.conf.d/50-particleve.conf"] = (
         "[Time]\nNTP=" + " ".join(network["ntp"]) + "\n"
     )
@@ -77,6 +61,28 @@ def render(config):
             f"ExecStart=-/sbin/agetty --noclear --noreset -o '-p -- \\u' - {baud} vt220\n"
         )
     return files
+
+
+def firewall(config):
+    """Combine image-owned policy with installation-owned management settings."""
+    network = config["network"]
+    # Only our host-input table is replaced; guest forwarding remains independent.
+    rules = [
+        "destroy table inet particleve_host",
+        "table inet particleve_host {",
+        "  chain input {",
+        "    type filter hook input priority 0; policy drop;",
+        '    iifname "lo" accept',
+        "    ct state invalid drop",
+        "    ct state established,related accept",
+        "    meta l4proto { icmp, ipv6-icmp } accept",
+        '    iifname "vt-*" meta nfproto ipv4 udp sport 68 udp dport 67 accept',
+    ]
+    for source in network["allowed_sources"]:
+        family = "ip6" if ":" in source else "ip"
+        rules.append(f'    iifname "{network["management"]}" {family} saddr {source} tcp dport 22 accept')
+    rules += ["  }", "}"]
+    return "\n".join(rules) + "\n"
 
 
 def write(config, root):

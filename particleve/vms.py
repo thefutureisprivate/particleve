@@ -13,7 +13,7 @@ DROPIN = Path("/run/systemd/system/systemd-vmspawn@.service.d/zz-particleve-main
 
 
 def properties(command, name, fields):
-    text = run([command, "show", name, "--property=" + ",".join(fields)], timeout=15).stdout
+    text = run([command, "show", name, *(f"--property={field}" for field in fields)], timeout=15).stdout
     return dict(line.split("=", 1) for line in text.splitlines() if "=" in line)
 
 

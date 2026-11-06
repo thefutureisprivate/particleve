@@ -5,6 +5,12 @@ UEFI, Secure Boot, TPM2 and KVM support. Copy `examples/host.json` outside the
 checkout and configure stable whole-disk by-id paths and serials, permanent NIC
 MACs, network topology, management allowlists, SSH public keys, resource reserves
 and the real signed feed. Inspect a read-only preflight before preparing a plan.
+`render-network --output DIRECTORY` stages networkd configuration and a `host.nft`
+policy preview. At boot, `apply-firewall` renders the running image's policy from
+the bound host settings and sends it directly to nftables. Generic firewall fixes
+therefore follow the OS without replacing persistent installation settings.
+The host-input policy allows DHCP requests only on native vmspawn `vt-*` TAPs;
+management SSH remains restricted to the configured management sources.
 Install the ParticleVE integration RPM from the owner-trusted OBS repository;
 it includes the public release-verification material. Authenticate its repository
 key independently before importing it. `fetch-release` verifies the signed index,
@@ -88,6 +94,11 @@ compression; scrub cannot detect or repair corruption in those contents. Normal
 host and EFI/vTPM files keep CoW/checksums. Use the exact packaged vmspawn/QEMU
 options supported by the release and record persistent-state paths in acceptance
 evidence. Guest workload provisioning and backups are outside ParticleVE.
+The selected native interface supports `--efi-nvram-state=PATH` for a persistent
+file and `--tpm-state=PATH` for a persistent directory. Keep both within that VM's
+subvolume, with normal CoW; the `swtpm-tools` package supplies native TPM
+manufacturing and per-VM certificate setup. Test guest readiness notification,
+registration, disk/network I/O and restart persistence before commissioning.
 
 `particleve status` reports durable update/maintenance state and observed storage
 profiles, capacity, errors and swap redundancy. Keep configured byte/percentage

@@ -8,7 +8,7 @@ Conflicts=shutdown.target
 
 [Service]
 Type=oneshot
-ExecStart=/usr/sbin/nft --file /etc/particleve/host.nft
+ExecStart=/usr/bin/particleve apply-firewall
 RemainAfterExit=yes
 
 [Install]
