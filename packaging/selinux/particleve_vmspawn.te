@@ -130,8 +130,9 @@ allow particleve_vmspawn_t swtpm_t:process noatsecure;
 init_read_state(particleve_vmspawn_t)
 # The trusted launch guard reads its effective lifecycle properties from PID1.
 init_stream_connect(particleve_vmspawn_t)
-gen_require(`type systemd_systemctl_exec_t;')
+gen_require(`type systemd_systemctl_exec_t, systemd_unit_file_t;')
 can_exec(particleve_vmspawn_t, systemd_systemctl_exec_t)
+allow particleve_vmspawn_t systemd_unit_file_t:service status;
 # Native QMP disk hotplug opens prevalidated controller descriptors through procfs.
 allow svirt_t particleve_vmspawn_t:dir search;
 allow svirt_t particleve_vmspawn_t:lnk_file read_lnk_file_perms;
