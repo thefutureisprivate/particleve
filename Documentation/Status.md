@@ -6,22 +6,62 @@ firmware has been modified. Automatic OS preparation and maintenance timers stay
 disabled. The owner selected delivery as an uncommissioned candidate; physical
 commissioning and enabling automation are outside this delivery.
 
-Candidate implementation and disposable acceptance completed on signed 45.1
+The original implementation and disposable acceptance completed on signed 45.1
 (`4db94b572a1f096e192ace7ed480ca26305cb7b1`). That image used kernel
 `7.2.15-300.fc45`, systemd `262.1+200+g63511d728-73.1`, QEMU `11.1.3-1.fc45`,
-swtpm `0.10.2-1.fc45` and fwupd `2.1.9-1.fc45`. Documentation-only successors
-carry the same implementation; the evidence below names the actual tested images.
+swtpm `0.10.2-1.fc45` and fwupd `2.1.9-1.fc45`. The evidence below names the
+actual tested images. Documentation-only successors are checked against the
+implementation-content identity.
 
-## Proven disposable behavior
+## Review correction acceptance
 
-Review corrections after 46.1 add numeric firmware-state handling, protected
+The seven review corrections add numeric firmware-state handling, protected
 activation-time shutdown, explicit policy reconfiguration, content-bound RPM/image
 inputs, pre-write mapper checks, canonical IPv6 assessment and strict process
 inspection. They also separate package provenance from versioned retained-state
-interfaces. Regression checks pass; signed-image delayed-readiness and
-interrupted-start acceptance for the new supervisor are still pending. The older
-acceptance below does not prove those new cases. Automatic OS enablement remains
-outside this candidate delivery.
+interfaces. Ruff, formatting, shell syntax and all 118 tests pass, including the
+disposable GPG checks. OBS's native RPM build also passed all 118 tests and
+compiled the SELinux policy.
+
+Signed 50.2 uses implementation source
+`b24707df6662f1531948262f6bfba9a126763e77` and implementation-content SHA256
+`1e18c60067640a2347d265f6599264d93949af8f89ea719ced1abe429e727fe0`.
+Its integration and build-tools payload identities passed native build and final
+signing checks. Regression tests reject stale packages and modified payloads,
+while documentation-only changes retain the implementation identity.
+
+On signed 50.2, a controlled 150-second guest boot job delayed native readiness
+until 164 seconds. The unit stayed activating past 125 seconds with the same
+QEMU PID, start time and invocation. Pinned guest SSH confirmed the delay job was
+running. In the next invocation, native stop was requested while the unit was
+still activating. The supervisor requested native ACPI poweroff; all four VM
+processes exited in about two seconds. The unit reported result success and exit
+status zero.
+No SIGKILL fallback or inspection error appeared. After restart, pinned SSH and
+the synced guest marker survived. The guest journal recorded the power-button
+request, orderly poweroff and filesystem unmounting. The temporary guest delay
+unit was removed.
+
+The final native inventory accepted the supervisor, unmodified vmspawn, QEMU and
+swtpm with the same MCS pair and no `CAP_NET_ADMIN`. Raw disks alone retained
+NOCOW; EFI/vTPM files retained CoW. Both boot paths authenticated, storage/swap
+health and firmware-clear checks passed. Ordinary host shutdown also stopped the
+running guest gracefully. A cold boot after restarting the private software TPM
+unlocked unattended and passed native assessment, blessing and runtime readiness;
+disabled external guest startup was honored. Commissioning stayed unset and
+automatic OS timers stayed inactive.
+
+Native policy reconfiguration passed on the fresh signed 47.1 installation:
+diagnostics and automation-disable worked with an invalid binding, a reviewed
+maintenance-reserve change rebound the configuration, and the reverse reviewed
+transaction restored the exact original configuration and installation identity.
+Interrupted-transaction recovery has regression coverage. The original 45.1
+fixture remains offline and separate; no retained-data or old external-unit
+migration was performed. The new external unit interface is documented in
+[operation](Operations.md). Routine package-version changes are covered by the
+explicit retained-state contract; incompatible interface changes still defer.
+
+## Earlier disposable acceptance
 
 | Area | Evidence |
 | --- | --- |

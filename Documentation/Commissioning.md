@@ -41,3 +41,11 @@ to configuration and installation hashes and enables the guarded prepare timer a
 invalidates that binding. `particleve disable-automation` stops the timers and removes
 the commissioning marker. Persistent manual maintenance independently inhibits both
 preparation and activation under the same durable lock.
+
+Operational policy changes use the reviewed
+[`reconfigure` transaction](Operations.md) under persistent maintenance before
+new commissioning evidence is supplied. Keep the previously bound configuration
+for that review. Disk identities use the dedicated replacement procedure; the
+policy transaction does not change layout, network, host identity, trust or access
+settings. Diagnostics and automation-disable remain available with an invalid
+configuration binding.
