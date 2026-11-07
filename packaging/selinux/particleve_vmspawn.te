@@ -19,7 +19,7 @@ can_exec(particleve_vmspawn_t, particleve_vmspawn_exec_t)
 
 # Native user-namespace UID/GID maps require these capabilities in the parent namespace.
 allow particleve_vmspawn_t self:capability { setfcap setgid setpcap setuid sys_admin sys_resource };
-allow particleve_vmspawn_t self:process { getcap setcap setrlimit };
+allow particleve_vmspawn_t self:process { getattr getcap setcap setrlimit };
 allow particleve_vmspawn_t self:user_namespace create;
 allow particleve_vmspawn_t self:cap_userns { sys_admin sys_ptrace };
 allow particleve_vmspawn_t self:unix_stream_socket create_stream_socket_perms;
