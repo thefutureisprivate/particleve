@@ -11,7 +11,18 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from . import inventory, network
-from .common import array_uuid, atomic_write, digest, hash_file, lock, read_json, require, run, write_json
+from .common import (
+    Error,
+    array_uuid,
+    atomic_write,
+    digest,
+    hash_file,
+    lock,
+    read_json,
+    require,
+    run,
+    write_json,
+)
 from .layout import MIB, calculate, sfdisk_script
 from .linux import Linux
 from .release import verify_directory
@@ -449,6 +460,13 @@ def replace(config, backend, role, replacement, *, confirmation=None, keyfile=No
     )
     old, peer = backend.disk(role), backend.disk("b" if role == "a" else "a")
     require(not Path(old["path"]).exists(), "disconnect the failed disk before replacement")
+    mapper = f"particleve-state-{role}"
+    try:
+        (Path("/dev/mapper") / mapper).lstat()
+    except FileNotFoundError:
+        pass
+    else:
+        raise Error("old state mapper is still present; reboot degraded before planning replacement")
     observed = inventory.observe_disk(replacement, unused=True)
     require(observed["identity"] != inventory.observe_disk(peer)["identity"], "replacement aliases survivor")
     require(
@@ -493,7 +511,6 @@ def replace(config, backend, role, replacement, *, confirmation=None, keyfile=No
     partition(device)
     run(["mkfs.vfat", "-F", "32", member(device, "esp")])
     write_os(device, release, backend.cache / release["version"])
-    mapper = f"particleve-state-{role}"
     device["state_luks_uuid"] = format_encrypted(member(device, "state"), mapper, keyfile, enroll=True)
     device["btrfs_device_uuid"] = None
     record = json.loads(json.dumps(backend.manifest))

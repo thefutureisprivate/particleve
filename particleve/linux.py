@@ -1,5 +1,6 @@
 """Linux backend. Disk targets always come from the encrypted installation manifest."""
 
+import ipaddress
 import json
 import re
 import tempfile
@@ -40,13 +41,17 @@ class Linux:
 
         return status(self.config, self.manifest["devices"], healthy=healthy)
 
-    def __init__(self, config, directory):
+    def __init__(self, config, directory, *, allow_unbound=False):
         self.config = config
         self.directory = Path(directory)
         self.manifest = read_json(self.directory / "installation.json")
         require(self.manifest.get("schema") == 1, "unknown installation manifest schema")
         require(
-            self.manifest["config_sha256"] == digest(config),
+            not (self.directory / "reconfiguration.json").exists(),
+            "reconfiguration interrupted; resume the exact reviewed operation",
+        )
+        require(
+            allow_unbound or self.manifest["config_sha256"] == digest(config),
             "host configuration changed; recommission explicitly",
         )
         self.cache = self.directory / "releases"
@@ -170,8 +175,12 @@ class Linux:
 
         def pending(value):
             if isinstance(value, dict):
-                if value.get("UpdateState") in (1, "pending", "needs-reboot"):
-                    return True
+                if "UpdateState" in value:
+                    state = value["UpdateState"]
+                    # Native fwupd 2.x JSON uses its numeric UpdateState enum.
+                    require(type(state) is int and state in range(6), "unknown fwupd update state")
+                    if state in (1, 4):  # Pending or NeedsReboot.
+                        return True
                 return any(pending(v) for v in value.values())
             return isinstance(value, list) and any(pending(v) for v in value)
 
@@ -400,9 +409,9 @@ class Linux:
         network = json.loads(
             run(["ip", "--json", "address", "show", "dev", self.config["network"]["management"]]).stdout
         )
-        actual = {a["local"] for d in network for a in d.get("addr_info", [])}
+        actual = {ipaddress.ip_address(a["local"]) for d in network for a in d.get("addr_info", [])}
         require(
-            {a.split("/")[0] for a in self.config["network"]["addresses"]} <= actual,
+            {ipaddress.ip_interface(a).ip for a in self.config["network"]["addresses"]} <= actual,
             "management addresses missing",
         )
         run(["systemctl", "is-active", "systemd-machined.service"])

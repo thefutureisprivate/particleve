@@ -5,6 +5,13 @@ or second ParticleOS download is required. `sources.lock.json` pins the upstream
 base, mkosi revision and fwupd-efi. Fedora 45 and the upstream stable systemd
 repository apply to runtime, initrd and build tools. Installed RPM origins and
 family versions are checked during the build, rather than inferred from names.
+The integration and build-tools RPMs also carry an implementation-content identity
+and hashes of their installed payloads. The image checkout computes the expected
+identity from runtime modules, helpers, policy sources, trust and packaging inputs.
+Both RPMs must match before image generation; final signing checks their payloads
+again before publishing a manifest. A failed or delayed independent source webhook
+therefore cannot publish new implementation inputs with an old coordinator or
+signing helper. Documentation-only changes retain the same implementation identity.
 The final EROFS payload is also checked for retained boot/storage and Intel/AMD
 KVM drivers, including built-in driver metadata, after mkosi's module filtering.
 Module selectors use the pinned mkosi's glob syntax; directory selectors end in `/`.

@@ -7,6 +7,8 @@ import tempfile
 from pathlib import Path
 
 from .common import read_json, require, run, write_json
+from .contracts import PERSISTENT_STATE
+from .provenance import implementation_digest, verify_package
 
 
 def check_tpm_factory_config(root):
@@ -136,7 +138,14 @@ def summary_check(summary):
     )
 
 
-def root_check(root, *, tree="usr", output=None):
+def root_check(root, *, tree="usr", output=None, source_dir=None):
+    implementation = None
+    if tree in ("usr", "tools"):
+        require(source_dir is not None, "package identity needs the expected image source checkout")
+        implementation = implementation_digest(source_dir)
+        verify_package(
+            root, "integration" if tree == "usr" else "build-tools", implementation, source=source_dir
+        )
     query = "%{NAME}|%{EVR}|%{VENDOR}|%{DISTURL}\n"
     rows = [
         line.split("|", 3) for line in run(["rpm", "--root", root, "-qa", "--qf", query]).stdout.splitlines()
@@ -171,6 +180,7 @@ def root_check(root, *, tree="usr", output=None):
             "usr/libexec/particleve-homed-account",
             "usr/libexec/particleve-vm-stop",
             "usr/libexec/particleve-vm-start-guard",
+            "usr/libexec/particleve-vm-run",
             "usr/libexec/particleve-qemu/qemu",
             "usr/lib/particleve/particleve_vmspawn.pp",
         ):
@@ -266,15 +276,8 @@ def root_check(root, *, tree="usr", output=None):
         "schema": 1,
         "tree": tree,
         "systemd": family,
-        "persistent_state": {
-            "particleve-vm-label-contract": "confined-mcs-pair-v1",
-            **{
-                n: v
-                for n, v, _, _ in rows
-                if n in ("systemd", "systemd-container", "btrfs-progs", "libtpms", "kernel-core")
-                or n.startswith(("qemu-", "edk2-", "swtpm"))
-            },
-        },
+        "implementation_sha256": implementation,
+        "persistent_state": PERSISTENT_STATE.copy(),
         "packages": [
             {"name": n, "evr": v, "vendor": vendor, "origin": origin} for n, v, vendor, origin in rows
         ],

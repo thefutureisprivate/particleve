@@ -12,6 +12,7 @@ from pathlib import Path
 from .common import atomic_write, hash_file, read_json, require, run, write_json
 from .config import VERITY_SIGNATURE_SIZE, VERSION
 from .kernels import verify_modules
+from .provenance import verify_package
 from .release import inspect_uki, validate
 
 
@@ -40,6 +41,7 @@ def assemble(artifacts, version, root_hash, bootloader, fwupd_efi, verification,
         "usr_root_hash": root_hash,
         "sources": sources,
         "packages": verification["packages"],
+        "implementation_sha256": verification["implementation_sha256"],
         "artifacts": {},
     }
     for kind, suffix in (
@@ -105,6 +107,11 @@ def postoutput():
         root = work / "usr"
         run(["fsck.erofs", f"--extract={root}", usr[0]], timeout=600)
         verification = read_json(root / "lib/particleve/verification.json")
+        view = work / "view"
+        view.mkdir()
+        (view / "usr").symlink_to(root, target_is_directory=True)
+        verify_package(view, "integration", verification["implementation_sha256"])
+        verify_package(Path("/"), "build-tools", verification["implementation_sha256"])
         kernel_verification = verify_modules(root / "lib/modules")
         build = read_json(root / "lib/particleve/build.json")
         certificate = root / "lib/particleve/trust/secure-boot.crt"

@@ -10,6 +10,7 @@ from particleve.confinement import (
     PTY_ALLOC,
     PTY_TYPE,
     QEMU_HANDOFF,
+    check_unit_contract,
     context,
     private_directory,
     qemu_handoff,
@@ -19,6 +20,38 @@ from particleve.confinement import (
 
 
 class ConfinementTests(unittest.TestCase):
+    def test_external_unit_cannot_bypass_activation_or_stop_protection(self):
+        values = {
+            "ExecStart": "{ path=/usr/libexec/particleve-vm-run ; argv[]=runner test native; }",
+            "ExecStop": "particleve-vm-stop test",
+            "KillMode": "mixed",
+            "KillSignal": "15",
+            "WatchdogSignal": "15",
+            "SendSIGKILL": "no",
+            "TimeoutStartUSec": "infinity",
+            "TimeoutStopUSec": "infinity",
+            "TimeoutAbortUSec": "infinity",
+            "NotifyAccess": "all",
+            "ExitType": "cgroup",
+        }
+        for override in (
+            {},
+            {"ExecStart": "{ path=/usr/bin/systemd-vmspawn ; }"},
+            {"TimeoutStartUSec": "2min"},
+            {"SendSIGKILL": "yes"},
+            {"KillMode": "control-group"},
+        ):
+            result = "\n".join(k + "=" + v for k, v in (values | override).items())
+            with (
+                self.subTest(override=override),
+                patch("particleve.confinement.run", return_value=SimpleNamespace(stdout=result)),
+            ):
+                if override:
+                    with self.assertRaises(Error):
+                        check_unit_contract("systemd-vmspawn@test.service")
+                else:
+                    check_unit_contract("systemd-vmspawn@test.service")
+
     def test_private_directory_rejects_a_symlink(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -53,6 +86,7 @@ class ConfinementTests(unittest.TestCase):
                     patch("particleve.confinement.os.geteuid", return_value=0),
                     patch("particleve.confinement.os.access", return_value=True),
                     patch("particleve.confinement.shutil.which", return_value=QEMU_HANDOFF),
+                    patch("particleve.confinement.check_unit_contract"),
                     patch("particleve.confinement.GATE") as gate,
                     patch("particleve.confinement.MACHINES", machines),
                     patch("particleve.confinement.RUNTIME", runtime),

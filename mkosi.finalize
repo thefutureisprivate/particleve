@@ -16,7 +16,7 @@ if [ -d "$BUILDROOT/var/lib/dpkg" ]; then
     mv "$BUILDROOT/var/lib/dpkg" "$BUILDROOT/usr/share/factory/var/lib/dpkg"
 fi
 
-PYTHONPATH="$SRCDIR" python3 "$SRCDIR/tools/check-build.py" --root / --tree tools
+PYTHONPATH="$SRCDIR" python3 "$SRCDIR/tools/check-build.py" --root / --tree tools --source-dir "$SRCDIR"
 
 # Validate the installed tree, rather than inferring provenance from requested packages.
 PYTHONPATH="$SRCDIR" python3 "$SRCDIR/tools/check-build.py" --root "$BUILDROOT" \

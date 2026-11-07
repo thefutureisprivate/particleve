@@ -92,6 +92,26 @@ local passwd database without mistaking NSS-provided homed users for classic
 accounts. Test an inactive home, a fresh SSH connection and a host reboot before
 relying on remote administration. Keep independent console recovery available.
 
+Operational policy changes use an explicit reconfiguration transaction. Keep a
+copy of the previously bound host JSON before editing it. In persistent maintenance,
+with no pending update or replacement, review the proposed maintenance settings,
+minimum RAM and Btrfs reserve/metadata thresholds:
+
+```sh
+particleve maintenance enter --reason 'review operational policy'
+particleve reconfigure --previous-config /run/host-before.json --proposed /run/host-next.json
+particleve reconfigure --previous-config /run/host-before.json --proposed /run/host-next.json --confirm REVIEWED_PLAN_SHA256
+```
+
+The confirmed operation disables automatic OS timers, invalidates commissioning,
+and durably updates the configuration and installation binding. A journal blocks
+ordinary maintenance if interrupted; repeat the exact reviewed command to finish
+it. Maintenance stays active, and the changed binding needs new commissioning
+evidence. This operation changes operational policy only. Disk identities use
+`replace-disk`; layout, network, host identity, trust and access settings are outside
+this operation. `status` remains diagnostic when binding is invalid, and
+`disable-automation` works even with unreadable or invalid host JSON.
+
 External configuration owns VM definitions and startup policy. Use the packaged
 `systemd-vmspawn@.service` template and keep machined registration/cgroup ownership
 intact. Place each raw image in its own externally created subvolume under
@@ -117,6 +137,8 @@ The external instance drop-in must set the matching process context:
 ```ini
 [Service]
 SELinuxContext=system_u:system_r:particleve_vmspawn_t:s0:c10,c20
+ExecStart=
+ExecStart=/usr/libexec/particleve-vm-run %i /usr/bin/systemd-vmspawn --quiet --register=yes --keep-unit --machine=%i --image=/var/lib/machines/%i/disk.raw --network-tap --notify-ready=yes
 ```
 
 The mandatory internal launch guard rejects missing/mismatched categories,
@@ -139,12 +161,17 @@ is removed from the whole VM unit. The policy is compiled during the integration
 RPM build and incorporated into the image's factory policy; policy development
 tools are not runtime inputs.
 
-The host's template drop-in sends native ACPI poweroff and waits for every VM
-process before completing a normal unit stop or host shutdown. It uses an
-unbounded stop timeout so a refusing guest needs owner assistance instead of
-falling through to vmspawn's signal handler, which kills QEMU when SSH injection
-is disabled. Keep this synchronous `ExecStop` when overriding VM arguments.
-Inspection errors retain the wait instead of falling through to signals.
+The small supervisor remains the unit's main process while native vmspawn owns
+the VM and sends readiness/watchdog notifications. There is no automatic startup
+deadline. A stop during activation reaches the supervisor, which requests native
+ACPI poweroff and waits; it never forwards a termination signal to vmspawn/QEMU.
+Normal successful-start shutdown also retains the synchronous `ExecStop` helper.
+Both stop/abort deadlines are unbounded and automatic final SIGKILL is disabled.
+A refusing guest or failed inspection therefore needs owner assistance. Keep the
+supervised `ExecStart`, synchronous `ExecStop`, and packaged lifecycle settings
+when overriding VM arguments; the launch guard rejects bypasses. This is a changed
+external unit interface. Review existing definitions explicitly; no retained VM
+definitions, labels, disks or auxiliary files are migrated automatically.
 Automatic maintenance retains its separate bounded refusal/recovery transaction
 while the host is still running; it never enters host shutdown with live VMs.
 The selected native interface supports `--efi-nvram-state=PATH` for a persistent
@@ -191,6 +218,14 @@ blessing; failed candidates exhaust bounded attempts and fall back. The retained
 OS quarantines failed releases before VM runtime access. Changed Btrfs/systemd/
 QEMU/firmware state contracts require explicit evidence that the retained OS can
 read current state; no writable-state or guest-state migration is automatic.
+Exact RPM versions remain in release provenance. The signed `persistent_state`
+object instead declares versioned filesystem, VM unit, label, raw-disk, EFI and
+vTPM interfaces. Package-only updates with the same declared contract are eligible
+without a local version-pair approval. Publishers must validate retained-OS access
+before retaining a contract across an upstream change; format-affecting changes
+must advance the appropriate interface and retain explicit compatibility review.
+The old package-version contract and the supervised-unit contract differ, so an
+old candidate cannot silently approve this transition or rewrite retained state.
 
 Before commissioning, supervised update acceptance uses `particleve prepare
 --manual`, then `particleve activate --manual`. Manual activation starts immediately
@@ -200,7 +235,10 @@ It does not enable either automatic timer. The timer always uses plain `activate
 and requires commissioning and the 04:30 window.
 
 For disk replacement, enter persistent maintenance, physically identify the failed
-member and select its role. `replace-disk --role … --disk /dev/disk/by-id/… --serial …`
+member and select its role. If the old state mapper remains after hot removal,
+reboot degraded before planning replacement; the preflight refuses before any
+journal or replacement write while that mapper exists.
+`replace-disk --role … --disk /dev/disk/by-id/… --serial …`
 first prints a deterministic reviewable erasing plan; the second invocation needs
 its exact confirmation and independent recovery-key file. It refreshes crypttab
 from the new LUKS identities, waits in the foreground for the Btrfs device copy,

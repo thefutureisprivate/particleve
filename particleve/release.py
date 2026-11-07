@@ -24,6 +24,11 @@ def validate(manifest):
         isinstance(manifest["persistent_state"], dict) and manifest["persistent_state"],
         "declare the retained-OS filesystem and VM auxiliary-state contract",
     )
+    if "implementation_sha256" in manifest:
+        require(
+            re.fullmatch(r"[0-9a-f]{64}", manifest["implementation_sha256"]),
+            "invalid implementation content identity",
+        )
     require(re.fullmatch(r"[0-9a-f]{64}", manifest["usr_root_hash"]), "invalid usr verity root hash")
     for revision in ("particleos", "mkosi"):
         require(

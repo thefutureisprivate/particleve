@@ -6,7 +6,7 @@ import shutil
 import stat
 from pathlib import Path
 
-from .common import require
+from .common import require, run
 
 MACHINES = Path("/var/lib/machines")
 RUNTIME = Path("/run/particleve-vm")
@@ -15,6 +15,41 @@ CONTROLLER = "particleve_vmspawn_t"
 QEMU_HANDOFF = "/usr/libexec/particleve-qemu/qemu"
 PTY_ALLOC = "system_u:object_r:particleve_vmspawn_pty_alloc_t:s0:c0.c1023"
 PTY_TYPE = "particleve_vmspawn_devpts_t"
+
+
+def check_unit_contract(unit):
+    fields = (
+        "ExecStart",
+        "ExecStop",
+        "KillMode",
+        "KillSignal",
+        "WatchdogSignal",
+        "SendSIGKILL",
+        "TimeoutStartUSec",
+        "TimeoutStopUSec",
+        "TimeoutAbortUSec",
+        "NotifyAccess",
+        "ExitType",
+    )
+    result = run(["systemctl", "show", unit, *("--property=" + field for field in fields)])
+    values = dict(line.split("=", 1) for line in result.stdout.splitlines() if "=" in line)
+    require(
+        "path=/usr/libexec/particleve-vm-run " in values.get("ExecStart", ""),
+        "external unit must launch the native runner through particleve-vm-run",
+    )
+    require("particleve-vm-stop" in values.get("ExecStop", ""), "VM synchronous stop helper is required")
+    for field, expected in {
+        "KillMode": "mixed",
+        "KillSignal": "15",
+        "WatchdogSignal": "15",
+        "SendSIGKILL": "no",
+        "TimeoutStartUSec": "infinity",
+        "TimeoutStopUSec": "infinity",
+        "TimeoutAbortUSec": "infinity",
+        "NotifyAccess": "all",
+        "ExitType": "cgroup",
+    }.items():
+        require(values.get(field) == expected, f"VM lifecycle protection overridden: {field}")
 
 
 def context(value, expected_type):
@@ -63,6 +98,7 @@ def start_guard(name):
         line[3:] for line in Path("/proc/self/cgroup").read_text().splitlines() if line.startswith("0::")
     ]
     require(len(groups) == 1 and Path(groups[0]).name == unit, "VM guard must run in its owning unit")
+    check_unit_contract(unit)
     categories = context(Path("/proc/self/attr/current").read_text(), CONTROLLER)
     root = MACHINES / name
     require(private_directory(root).st_ino == 256, "VM root must be a Btrfs subvolume")

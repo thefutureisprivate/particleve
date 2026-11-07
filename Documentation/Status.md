@@ -14,6 +14,15 @@ carry the same implementation; the evidence below names the actual tested images
 
 ## Proven disposable behavior
 
+Review corrections after 46.1 add numeric firmware-state handling, protected
+activation-time shutdown, explicit policy reconfiguration, content-bound RPM/image
+inputs, pre-write mapper checks, canonical IPv6 assessment and strict process
+inspection. They also separate package provenance from versioned retained-state
+interfaces. Regression checks pass; signed-image delayed-readiness and
+interrupted-start acceptance for the new supervisor are still pending. The older
+acceptance below does not prove those new cases. Automatic OS enablement remains
+outside this candidate delivery.
+
 | Area | Evidence |
 | --- | --- |
 | Build and publication | Four package-scoped GitHub hooks import source changes. OBS signs and publishes complete images and RPMs. Dependency-only rebuild 26.2 advanced the image version without changing Git or the retained-state contract. Source build 45.1 completed automatically after its RPM dependencies were published, using the original repository layout and flags. |

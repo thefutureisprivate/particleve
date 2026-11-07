@@ -6,7 +6,7 @@ import os
 import sys
 from pathlib import Path
 
-from . import commission, config, install, inventory, network, release
+from . import commission, config, install, inventory, network, reconfigure, release
 from .common import Error, atomic_write, digest, lock, read_json, require, run, write_json
 from .coordinator import Coordinator
 from .linux import Linux
@@ -72,6 +72,10 @@ def parser():
     commissioning = commands.add_parser("commission")
     commissioning.add_argument("--evidence", required=True)
     commissioning.add_argument("--enable", action="store_true")
+    settings = commands.add_parser("reconfigure", help="review and rebind operational policy in maintenance")
+    settings.add_argument("--previous-config", required=True, help="the previously bound configuration")
+    settings.add_argument("--proposed", required=True, help="the proposed validated policy")
+    settings.add_argument("--confirm", help="SHA256 of the reviewed reconfiguration plan")
     replacement = commands.add_parser("replace-disk")
     replacement.add_argument("--role", choices=("a", "b"), required=True)
     replacement.add_argument("--disk", required=True)
@@ -82,6 +86,26 @@ def parser():
 
 
 def execute(args):
+    if args.command == "disable-automation":
+        require(os.geteuid() == 0, "host maintenance commands require root")
+        print(json.dumps(reconfigure.disable_automation(args.state_dir), indent=2))
+        return 0
+    if args.command == "reconfigure":
+        require(os.geteuid() == 0, "host maintenance commands require root")
+        result = reconfigure.reconfigure(
+            args.state_dir,
+            args.config,
+            read_json(args.previous_config),
+            read_json(args.proposed),
+            confirmation=args.confirm,
+        )
+        print(json.dumps(result, indent=2))
+        return 0
+    if args.command == "status":
+        result = reconfigure.binding_status(args.config, args.state_dir)
+        if not result["config_binding"]["valid"] or result["reconfiguration_pending"]:
+            print(json.dumps(result, indent=2))
+            return 0
     host = config.validate(
         read_json(args.config), publication=args.command not in ("preflight", "render-network")
     )
@@ -120,7 +144,9 @@ def execute(args):
     else:
         if args.command != "status":
             require(os.geteuid() == 0, "host maintenance commands require root")
-        backend = Linux(host, args.state_dir)
+        backend = Linux(
+            host, args.state_dir, allow_unbound=args.command == "maintenance" and args.action == "enter"
+        )
         coordinator = Coordinator(args.state_dir, backend)
         if args.command == "prepare":
             result = coordinator.prepare(automatic=not args.manual)
@@ -145,19 +171,6 @@ def execute(args):
         elif args.command == "commission":
             with lock(args.state_dir):
                 result = commission.commission(backend, args.evidence, enable=args.enable)
-        elif args.command == "disable-automation":
-            with lock(args.state_dir):
-                run(
-                    [
-                        "systemctl",
-                        "disable",
-                        "--now",
-                        "systemd-sysupdate-update.timer",
-                        "particleve-maintenance.timer",
-                    ]
-                )
-                (backend.directory / "commissioned.json").unlink(missing_ok=True)
-            result = {"automation_enabled": False}
         elif args.command == "recover-vms":
             with lock(args.state_dir):
                 result = backend.recover_vms()

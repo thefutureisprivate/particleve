@@ -24,8 +24,10 @@ def process_identity(pid):
         # comm may contain spaces/parentheses; starttime is field 22 after the final ')'.
         tail = Path(f"/proc/{pid}/stat").read_text().rsplit(")", 1)[1].split()
         return {"pid": int(pid), "starttime": int(tail[19])}
-    except OSError, ValueError, IndexError:
+    except FileNotFoundError, ProcessLookupError:
         return None
+    except (ValueError, IndexError) as exc:
+        raise Error(f"cannot parse process identity for PID {pid}") from exc
 
 
 def unit_state(unit):
@@ -50,10 +52,17 @@ def unit_state(unit):
 def cgroup_processes(cgroup):
     require(cgroup.startswith("/") and ".." not in cgroup.split("/"), "invalid VM cgroup")
     root = Path("/sys/fs/cgroup") / cgroup.lstrip("/")
-    if not root.exists():
+    try:
+        root.stat()
+    except FileNotFoundError:
         return []
     result = set()
-    for path in [root / "cgroup.procs", *root.glob("**/cgroup.procs")]:
+
+    def failed(exc):
+        raise exc
+
+    for directory, _, _ in os.walk(root, onerror=failed):
+        path = Path(directory) / "cgroup.procs"
         try:
             result.update(int(pid) for pid in path.read_text().splitlines())
         except FileNotFoundError:
@@ -172,6 +181,10 @@ class LinuxVMs:
             require(
                 "vm-start-guard" in state["ExecStartPre"],
                 "VM start guard was removed by external configuration",
+            )
+            require(
+                "path=/usr/libexec/particleve-vm-run " in state["ExecStart"],
+                "native VM lifecycle supervisor was removed by external configuration",
             )
             if inhibited:
                 require(

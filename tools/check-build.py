@@ -19,11 +19,11 @@ args = parser.parse_args()
 if args.summary:
     summary_check(read_json(args.summary))
 else:
-    if args.source_dir:
+    if args.source_dir and args.tree == "usr":
         build_file = args.root / "usr/lib/particleve/build.json"
         build = read_json(build_file)
         source_name, revision = source_revision(args.source_dir)
         build["sources"][source_name] = revision
         write_json(build_file, build)
-    root_check(args.root.resolve(), tree=args.tree, output=args.output)
+    root_check(args.root.resolve(), tree=args.tree, output=args.output, source_dir=args.source_dir)
 print(json.dumps({"verification": "passed"}))

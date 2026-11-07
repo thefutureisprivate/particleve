@@ -128,6 +128,8 @@ allow particleve_vmspawn_t swtpm_t:process noatsecure;
 
 # Native unit discovery reads PID1 cgroup state; only the trusted controller does so.
 init_read_state(particleve_vmspawn_t)
+# The trusted launch guard reads its effective lifecycle properties from PID1.
+init_stream_connect(particleve_vmspawn_t)
 # Native QMP disk hotplug opens prevalidated controller descriptors through procfs.
 allow svirt_t particleve_vmspawn_t:dir search;
 allow svirt_t particleve_vmspawn_t:lnk_file read_lnk_file_perms;
